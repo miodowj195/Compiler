@@ -1,0 +1,12 @@
+This is a test for non-scientific reals. These are defined as:
+real ::= <int>* DOT <int>*
+
+1.2
+.2
+2.
+2..0
+..0
+2..
+2.0.
+2.0.
+-1.200

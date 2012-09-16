@@ -1,0 +1,16 @@
+This file tests for quoted strings. They are defined as:
+(^ denotes zero or more)
+
+STRING ::= QUOTE <character>^ QUOTE
+
+Single quote symbols can be escaped with aleading '. Any quote that is 
+not terminated before EOF or line boundary is considered to be an ESTRING
+
+' quote '
+' '
+' '' '
+' equote
+junk
+''''
+'''
+

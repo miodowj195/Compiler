@@ -1,0 +1,14 @@
+This program tests to see if an ID is recognized
+IDs consist of a letter followed by anynumber of 
+alpha-numerical characters and '_'
+
+a1
+2a
+a/
+/a
+a23498739skajdfh98shadfkljh39r8halksdfjh92384y
+d0289347
+program
+_a
+
+

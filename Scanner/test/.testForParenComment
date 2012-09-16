@@ -1,0 +1,22 @@
+This is a test for a paren comment they are of the form '(* <comments> *)
+They can span one line or multiple, however, only the first line of 
+text will be stored in the tok.str field of the token. Any token that 
+does not terminate before EOF is considered an ECOMMENT
+
+
+
+(* *)
+(* test *)
+(*test*)
+(**test*)
+(**test**)
+(* program *)
+(* multiline
+comment
+*)
+( )
+(* ecomment
+
+
+
+

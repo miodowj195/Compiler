@@ -1,0 +1,5 @@
+These files serve as input  programs from Scanner.java (and by extension,
+TokenReader.java) can be tested. Each file named to describe what they 
+are testing, although there is some overlap. For a more detailed descripton
+of the individual tests, see the header in the corresponding test.
+
