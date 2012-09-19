@@ -1,0 +1,30 @@
+This folder contains the names and descriptions of the files in this folder.
+For more specific details on the defenitions of the tokens, please see the 
+assignment description.
+
+Files
+		463.jar, EXTRA_CREDIT_README, Scanner.java, Token.java, TokenReader.java
+
+Descriptions
+
+	463.jar							- a utility jar provided to make method calls for things like a lazy stream
+												reader
+	EXTRA_CERDIT_README - File describing the defenitions of what it means to be a paren comment and 
+												a scientific real number.
+
+	README							- This file.
+
+	Scanner.java		 		- This class is used to drive the finite state machines found in TokenReader.java
+										 		and then handle it's output with a cross reference table, which behaves 
+										 		as per the inlcuded assignment instructions.
+ 
+	Token.java		 			 - Enumerates the reserved words for this language. This enum is referenced 
+							 				   elsewhere as a way to build a lookup table. It also defines the important
+							 					 information needed for token identification.
+
+	TokenReader.java 		- Defines the behavior of how tokens will be parsed. This is accomplished
+												with many finite state machines. For more specific details on their
+												operation, please refer to the inline comments in this file. 
+
+ Created by Jonathan Miodownik, 19Sept12
+ Last modified 19Sept12 

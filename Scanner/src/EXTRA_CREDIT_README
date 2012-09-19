@@ -1,0 +1,14 @@
+The purpose of this README is to define the structure of two of the extra credit tokens
+NOTE: * denotes zero or more
+			^ denotes one or more
+
+The paren comment is defined as: COMMENT:= LPAREN TIMES <characters>* TIMES RPAREN
+
+The paren comment behaves exactly as the comment defined in assignment description. So any questions
+about it should be refered to there.
+
+Scientific Real Numbers are defined as: REAL:=<int> DOT <int>^ e <int>^
+																						:=<int> DOT <int>^ e MINUS <int>^
+
+For more specific information on how this is accomplished please see the inline comments in
+TokenReader.java

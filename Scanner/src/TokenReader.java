@@ -3,7 +3,6 @@ import cis463.fsm.*;
 import java.util.*;
 
 /**
- * <b> Description </b>
  * A TokenReader for Pascal tokens -- this tokenizes all reserved
  * words found in the Token.java class, binary and unary operands
  * as well as identifiers in compliance with the pascal specification
@@ -476,10 +475,17 @@ public class TokenReader implements StreamReader<Token> {
 								}
 				};
 
+				/**
+				 * at this point, we've already seen a number and a '.' if the next element
+				 * is a number this token is a REAL for sure, and possibly a scientific notation
+				 * real (see EXTRA_CREDIT_README for more details). If the following element is
+				 * anything but a number, put the '.' back on the lazyin stack, and make the token
+				 * an int
+				 */
 				private FSMState t_POSSIBLE_REAL_OR_SCI = new FSMState(){
 								public FSMState next(){
 												Character ch = lzyin.cur();
-
+												//Scientific notation check (please see referenced document above)
 												if(Character.isDigit(ch) && tok.str.length() == 1){
 																tok.str.append(".");
 																tok.str.append(ch);
@@ -503,6 +509,11 @@ public class TokenReader implements StreamReader<Token> {
 								}
 				};
 
+				/**
+				 * keep appending numbers until we see an 'e' or something else
+				 * if e, transision to next state, otherwise return the token as a
+				 * vanilla real number
+				 */
 				private FSMState t_POSSIBLE_SCI = new FSMState(){
 								public FSMState next(){
 												Character ch = lzyin.cur();
@@ -518,12 +529,17 @@ public class TokenReader implements StreamReader<Token> {
 																lzyin.adv();
 																return t_POSSIBLE_SCI_W_E;
 												}
-
-
 												return null;
 								}
 				};
 
+				/**
+				 * if here, we've now encountered <num>DOT<nums>e as per the convention
+				 * described in the documentation, the next character MUST be either a '-'	
+				 * or a number. If a '-' transistion to the next state. If a number we now KNOW 
+			 	 * this is a scientific real, so just keep pulling numbers until we hit anything else
+				 * otherwise, place e back on the lazyin stack, and return a vanilla real
+				 */
 				private FSMState t_POSSIBLE_SCI_W_E = new FSMState(){
 								public FSMState next(){
 												Character ch = lzyin.cur();
@@ -544,6 +560,12 @@ public class TokenReader implements StreamReader<Token> {
 								}
 				};
 
+				/**
+				 * this is very similar to t_POSSIBLE_SCI_W_E except that we no longer check for
+				 * '-', becasue we have already encounterd one. If the next character is a number,
+				 * append it to tok.str and loop back to this state. Otherwise, the '-' and the 'e'
+				 * need to be put back on the lzyin stack, and we return a vanilla real.
+				 */
 				private FSMState t_POSSIBLE_SIGNED_SCI_W_E = new FSMState(){
 								public FSMState next(){
 												Character ch = lzyin.cur();
@@ -559,6 +581,12 @@ public class TokenReader implements StreamReader<Token> {
 								}
 				};
 
+				
+				/**
+				 * We're sure this token is a real number, so keep pulling characters that are 
+				 * digits and append them to tok.str. Any other type of character terminated this
+				 * token.
+				 */
 				private FSMState t_REAL = new FSMState(){
 								public FSMState next(){
 												Character ch = lzyin.cur();
@@ -571,6 +599,13 @@ public class TokenReader implements StreamReader<Token> {
 								}
 				};
 
+				/**
+				 * As per the conventions of the documentation, appened anything to this token
+				 * that is a letter, digit, or underscore. Upon encountering a character that 
+				 * isn't one of those, check the tok.str value in a map of reserverd words
+				 * if that lookup returns null, the token is an ID, otherwise cast the value of
+				 * tok.str to uppercase, and label it as an it's reserved word value.
+				 */
 				private FSMState t_POSSIBLE_ID = new FSMState() {
 								public FSMState next(){
 												Character ch = lzyin.cur();
@@ -579,7 +614,8 @@ public class TokenReader implements StreamReader<Token> {
 																lzyin.adv();
 																return t_POSSIBLE_ID;
 												}
-
+												// it MUST be an ID becuase no reserved word is longer than 9 
+												// characters.
 												if(tok.str.length()>9){
 																tok.val = Token.Val.ID;
 																return null;
@@ -598,6 +634,10 @@ public class TokenReader implements StreamReader<Token> {
 								}
 				};
 
+				/**
+				 * if the next character is a '.', append it to tok.str and set tok.val to DOTDOT
+				 * otherwise, the token is just a DOT.
+				 */
 				private FSMState t_POSSIBLE_DOTDOT = new FSMState() {
 								public FSMState next() {
 												Character ch = lzyin.cur();
@@ -610,6 +650,10 @@ public class TokenReader implements StreamReader<Token> {
 								}
 				};
 
+				/**
+				 * if the next character is a '=' then this token is a ASSIGN, otherwise
+				 * do nothing with that character in cur and return the token as a COLON
+				 */
 				private FSMState t_POSSIBLE_ASSIGN = new FSMState() {
 								public FSMState next() {
 												Character ch = lzyin.cur();
@@ -621,6 +665,12 @@ public class TokenReader implements StreamReader<Token> {
 												return null;
 								}
 				};
+
+				/**
+				 * if the next character is '=' then the token is a GE, so modify it
+				 * accordingly. Otherwise, nothing should be done at the moment so just
+				 * return the token.
+				 */
 				private FSMState t_POSSIBLE_GE = new FSMState() {
 								public FSMState next() {
 												Character ch = lzyin.cur();
@@ -633,6 +683,11 @@ public class TokenReader implements StreamReader<Token> {
 								}
 				};
 
+				/**
+				 * if the next token is a '>'then this token is a NE. Also, if the 
+				 * character is a '=', the token is a LE. Anything else would make
+				 * this token a GT.
+         */
 				private FSMState t_POSSIBLE_NE_LE = new FSMState() {
 								public FSMState next() {
 												Character ch = lzyin.cur();
