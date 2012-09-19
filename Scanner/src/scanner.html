@@ -1,0 +1,514 @@
+<html>
+<head>
+<title>
+Scanner
+</title>
+</head>
+<body>
+<hr>
+<h1 align=center>
+CIS 463 - Compiler Design and Implementation</h1>
+<br>
+<h1>Project 1 - Pascal Scanner and Symbol Table
+</h1>
+<hr>
+<h2>
+Due date
+</h2>
+<p>
+<strong>
+Your scanner project is due by class time
+on Thursday, September 20.
+</strong> 
+Submission information is described below.
+<h2>
+Description
+</h2>
+<p>
+You are to implement a lexical scanner
+and symbol table for Pascal.
+<p>
+Pascal is a programming language that was designed
+by Nicklaus Wirth in the late 1960s
+and that has had a significant influence
+on several modern programming languages.
+A detailed description of the lexical properties of Pascal
+is given below.
+<p>
+A <em>lexical scanner</em> breaks up a program &mdash;
+actually just a stream of characters &mdash;
+into a stream of <em>tokens</em>,
+which correspond to units of information
+such as identifiers, constants, reserved words, and operators.
+A <em>symbol table</em> is a device
+for associating certain tokens
+(e.g. identifiers)
+with values and/or properties.
+<p>
+Your program should read in a text file
+and write out a list of all the Pascal tokens appearing in it,
+in the order in which they appear in the file.
+For each token,
+the output should appear on one line in the form
+<blockquote>
+line no.  tokenid  "display value"
+</blockquote>
+where 'line no.' is the number of the line
+on which the token <em>begins</em>,
+'tokenid' is the value of the token class
+(an <code>enum</code> value, as described later),
+and 'display value' is the string of characters
+representing the value of the token.
+The notion of 'display value' will be made more specific later.
+The display value should be printed surrounded by double quotes.
+<p>
+After printing the list of tokens described above,
+your program should print a cross-reference
+of all identifiers.
+This cross-reference should list all identifiers
+in alphabetical order
+and with each identifier
+a list of line numbers on which the identifier appears.
+The line numbers should be in ascending order
+and should not have any repetitions.
+Lists of line numbers that cannot fit on a 72-character line
+should be folded onto the next line,
+aligned with the line numbers above it.
+Format your output to conform to the output produced
+by the reference implementation described below.
+<p>
+Identifiers should be printed left-justified on a line
+in a field width of 30 characters.
+Although your scanner should not limit the number
+of characters in an identifier,
+for printing purposes you should truncate long identifiers
+so they will fit into a 30-character field width.
+Specifically, if an identifier has fewer than 30 characters,
+simply print it left-justified in the 30-character field.
+If an identifier has 30 or more characters,
+print the first 29 characters of the identifier
+followed by a plus sign (+) to indicate that it's a "long" identifier;
+the resulting display will fit exactly in a 30-character field.
+The printf specification for a left-justified 30-character string field
+is "%-30s".
+<p>
+Each line number cross-reference entry should be printed
+right-justified in a field of width 6:
+the first character of the field should be a space,
+and the remaining 5 characters should be the digits of the line number.
+The printf specification for this is " %5d".
+This can accommodate line numbers up to 99999,
+which should be sufficient for most programs.
+<p>
+Since the identifier field has size 30
+and each of the line number cross-reference entries takes up six digits,
+a line can accommodate exactly seven cross-reference entries
+to reach the limit of 72 characters on a line.
+Thus, if there are more than seven cross-reference entries
+for a particular identifier,
+you will need to go to a new line, print a field of 30 spaces,
+and then start printing the additional cross-reference entries.
+Your program should accommodate any number of cross-reference entries
+for any particular identifier.
+<p>
+In implementing your scanner,
+it is strongly recommended
+that you fully debug the lexical scanner
+(the <code>read()</code> method
+and associated finite state machine)
+before you start on the symbol table.
+The symbol table must be implemented
+using a Java <code>Map</code> structure.
+To alphabetize your identifiers,
+you should use <code>Arrays.sort()</code>.
+<h2>
+Specifications
+</h2>
+<p>
+A Pascal <strong>token</strong> is one of the following:
+<ol>
+<p><li>
+<strong>Any of the following single-character symbols:</strong>
+<blockquote><pre>
++ - * / = &lt; &gt; ( ) [ ] . , ; : ^
+</pre></blockquote>
+<p><li>
+<strong>Any of the following two-character symbols:</strong>
+<blockquote><pre>
+&lt;&gt;  &lt;=  &gt;=  ..  :=
+</pre></blockquote>
+<p><li>
+<strong>Any reserved word:</strong>
+<table>
+<tr><td>and<td>array<td>begin<td>case<td>const
+<tr><td>do<td>downto<td>div<td>else<td>end
+<tr><td>file<td>for<td>function<td>goto<td>if
+<tr><td>in<td>label<td>mod<td>nil<td>not
+<tr><td>of<td>or<td>otherwise<td>packed<td>procedure
+<tr><td>program<td>record<td>repeat<td>set<td>then<td>
+<tr><td>to<td>type<td>until<td>var<td>while
+<tr><td>with<td><td><td><td>
+</table>
+<p>
+[Note that 'otherwise' is not a reserved word
+in Jensen-Wirth Pascal.
+Also, ISO Standard Pascal may have a few reserved words not in this list.]
+<p><li>
+<strong>Identifier:</strong>
+a sequence of letters, digits and underscores '<samp>_</samp>'
+starting with a letter, excluding reserved words.
+<p>
+[ISO Standard Pascal does not allow underscores in identifiers.]
+<p><li>
+<strong>Unsigned integer:</strong>
+a sequence of one or more decimal digits.
+[ISO Standard Pascal permits signed integers (and reals).]
+<p><li>
+<strong>Real number:</strong>
+a sequence of one or more decimal digits followed by a decimal point
+(<samp>.</samp>) followed by another sequence of one or more decimal digits.
+Neither sequence of digits may be empty.
+<p>
+[You may ignore reals in scientific notation, such as <samp>1.0E+22</samp>.]
+<p><li>
+<strong>Quoted string:</strong>
+a sequence of zero or more printable characters delimited
+by single quote (<samp>'</samp>) symbols.
+A printable character is one whose ASCII encoding
+is in the range 32 to 127.
+<p>
+A single quote within a quoted string is represented
+as two adjacent quote symbols.
+A quoted string may not cross line boundaries,
+and must be terminated with a closing quote.
+<p>
+[ISO Standard Pascal does not permit empty quoted strings.]
+<p><li>
+<strong>Error string:</strong>
+a character sequence beginning with a single
+quote but not terminating before a newline or end-of-file.
+<p><li>
+<strong>Comment:</strong>
+a character sequence beginning with an open brace '{'
+and ending with a closing brace '}'.
+The comment ends with the first closing brace following the open brace.
+Comments may cross line boundaries.
+<p>
+[ISO Standard Pascal also allows comments
+within <code>(*</code> and <code>*)</code> pairs.]
+<p><li>
+<strong>Error comment:</strong>
+a character sequence beginning with an open
+brace '{' but not terminating before an end-of-file.
+<p><li>
+<strong>End-of-file:</strong>
+this token is returned when the end
+of the input file is reached.
+The display value of this token is the string '*EOF*'.
+<p><li>
+<strong>Error:</strong>
+this token is returned when a token is not of any of the
+above forms
+(e.g., the ampersand '<samp>&amp;</samp>' would be an error token).
+</ol>
+<p>
+As stated,
+this definition is ambiguous,
+since it is posible that the string
+<blockquote><pre>
+ab12
+</blockquote></pre>
+could be considered as the identifier token '<samp>ab</samp>'
+followed by the integer token '<samp>12</samp>',
+or as one identifier token, '<samp>ab12</samp>'.
+To resolve this ambiguity,
+<em>a token is always taken
+to be the longest sequence of characters possible
+satisfying the definitions given above.</em>
+<p>
+Except in comments and strings,
+whitespace (spaces, tabs, and newlines) is not part
+of any token and should be skipped.
+Note tabs and newlines (which are not printable characters)
+cannot belong to a string,
+but a space character (with ASCII code 32) is considered printable
+and can appear in strings.
+<p>
+The Java class <code>Token</code>
+is already defined for you in the file
+<samp><a href="../../Examples/Scanner/Help/Token.java">
+Token.java</a></samp>.
+This class includes an <code>enum Val</code> class
+that enumerates all of the values of the tokens
+(with their obvious relationships with the definitions given above),
+and defines fields that give
+the token value (<code>val</code>),
+the display string (<code>str</code>) of the token
+as a <code>StringBuffer</code>,
+and the integer line number (<code>lno</code>)
+that the token starts on.
+Line numbers start at one.
+<p>
+To start you off,
+consult the directory
+<blockquote>
+<a href="../../Examples/Scanner/Help">
+<samp>/home/student/Classes/463/Examples/Scanner/Help</samp>
+</a>
+</blockquote>
+This directory contains the definition of the Token class
+along with skeleton TokenReader and Scanner classes.
+See the README file in this directory for guidance
+about what do do with the Java files in this directory.
+<p>
+Your project should define a <code>TokenReader</code> class
+that implements the <code>StreamReader&lt;Token&gt;></code> interface.
+The <code>StreamReader&lt;Token&gt;</code> interface
+defines a single method <code>read()</code>.
+In the case of an instance of <code>TokenReader</code>,
+repeated calls to its <code>read()</code> method will
+return the Pascal tokens in the given file,
+one-by-one,
+until you reach end-of-file.
+<p>
+For a given token,
+you can extract the token value,
+the display string of the token,
+and the token line number
+by accessing the appropriately named public fields of the Token class.
+<p>
+You should create a <code>Scanner</code> class
+in a file <code>Scanner.java</code>
+that has a <code>main</code> method
+The <code>main()</code> method
+will create a <code>TokenReader</code> instance
+that takes its input from standard input
+and that will repeatedly call its <code>read()</code> method
+until an end-of-file token is found,
+printing the tokens line-by-line as they are read,
+in the format described above.
+After all tokens have been processed,
+a cross-reference table should be printed,
+preceded by a blank line and the following two header lines:
+<pre>
+Identifier Cross Reference Table
+--------------------------------
+</pre>
+If there are no identifiers in the input file,
+you should <em>not</em> print the blank line or the header lines.
+<p>
+The list of token names can be found in the <code>enum</code> class
+given in the <samp>Token.java</samp> file.
+<p>
+Note that each token name identified in the <samp>Token.java</samp> file
+has a print name that is the same as the name of the token
+in the <code>enum</code> list.
+For example, the following code will print "ADD":
+<blockquote>
+<pre>
+Token.Val val = Token.Val.ADD;
+System.out.println(val.toString());
+</pre>
+</blockquote>
+<p>
+Your scanner class file executable should be called <samp>Scanner</samp>.
+It should take its input from standard input,
+and produce its output (the token list and symbol table) to standard output.
+<h2>
+Test files
+</h2>
+<p>
+You should create a collection of test files
+that illustrate the behavior of your scanner.
+Taken together, these test files should exercise all aspects
+of your scanner,
+including correctly recognizing all tokens
+and properly displaying the scanner output.
+<p>
+Pay particular attention to things like
+distinguishing between one- and two-character tokens,
+properly handling reals vs. integers,
+dealing with quotes inside of strings,
+and formatting your cross-reference list.
+Just one test file will almost certainly not be sufficient
+to test everything.
+Your project grade will depend in part
+on the quality of your test files.
+<h2>
+Documentation
+</h2>
+You are expected to follow the
+<a href="../../Notes/documentation.html">
+documentation guidelines
+</a>
+for internal and external documentation.
+<h2>
+Submission
+</h2>
+You should develop your code, test files, and documentation
+in an appropriate working directory
+that is dedicated to this project.
+Include a <samp>README</samp> file in this directory
+to identify your code, documentation, and test files
+and to point out anything of interest to the grader.
+Do not put items in this subdirectory that do not directly relate
+to this project.
+<p>
+Let's assume that your working directory is called <samp>Scanner</samp>
+and that it's a subdirectory of the directory
+<samp>/home/student/&lt;login&gt;/463</samp>,
+where <samp>&lt;login&gt;</samp> is your login name.
+In the <samp>463</samp> directory,
+create a tar file of your <samp>Scanner</samp> directory as follows:
+<blockquote><pre>
+tar cf Scanner.tar Scanner
+</pre></blockquote>
+Submit this tar file using the command
+<blockquote><pre>
+submit 463 Scanner.tar
+</pre></blockquote>.
+<h2>
+Reference Implementation
+</h2>
+<p>
+You can find a reference implementation of the scanner program
+in a .jar file in the directory
+<blockquote>
+<a href="../../Examples/Scanner/Scantest"
+<samp>/home/student/Classes/463/Examples/Scanner/Scantest</samp>
+</a>
+</blockquote>
+The following command will run this program:
+<blockquote>
+<pre>
+java -jar scanner.jar
+</pre>
+</blockquote>
+You may redirect standard input from a file,
+so that if you wanted to run the reference implementation
+on a file named sort.p, you would do this:
+</blockquote>
+The following command will run this program
+with input from the file <code>sort.p</code>:
+<blockquote>
+<pre>
+java -jar scanner.jar < sort.p
+</pre>
+</blockquote>
+<strong>
+The output of your program should be identical
+to the output of the reference implementation.
+</strong>
+<p>
+If you want to run the reference implementation in a different directory,
+copy both the <samp>scanner.jar</samp> and <samp>463.jar</samp> files
+into that directory and then execute the following command:
+<blockquote><pre>
+java -jar scanner.jar
+</pre></blockquote>
+This will read from standard input, which you can redirect
+from a file as shown above.
+<h2>
+Assumptions
+</h2>
+<p>
+Reserved words may be in any mixture of upper- and lower-case,
+so that (for example)
+"<tt>BEGIN</tt>",
+"<tt>begin</tt>",
+and 
+"<tt>bEgIn</tt>"
+are all equivalent.
+<p>
+Identifers are case-sensitive,
+so that (for example)
+"<tt>EG</tt>" and "<tt>eg</tt>"
+are separate identifiers.
+<p>
+The display value of a reserved word,
+a one- or two-character symbol
+or an identifier
+is the print-string of that token,
+i.e. its lexeme.
+The display value of a reserved word
+should be converted to all uppercase.
+<p>
+The display value of an unsigned integer or of a real number
+is the print string of that number.
+<p>
+The display value of a quoted string is the string
+stripped of the leading and trailing quotes
+and replacing internal double quotes <samp>''</samp>
+with single quotes.
+<p>
+The display value of a comment
+is the text between the open and closing braces up to
+(but not including) the first end-of-line marker.
+<p>
+The display value of an error token is the offending character.
+The display value of the end-of-file token
+is the print string "<samp>*EOF*</samp>".
+<p>
+You should not assume the input to your <samp>scan</samp> program
+is a legal Pascal program,
+just that it is a sequence of tokens.
+However, there are two "real" Pascal programs in the directory
+<blockquote>
+<a href="../../Examples/Scanner/Scantest">
+<samp>/home/student/Classes/463/Examples/Scanner/Scantest</samp>
+</a>
+</blockquote>
+that you can use to test your program.
+<p>
+Any additional assumptions you make should be clearly stated
+in your documentation and should be reasonable and justified.
+<h2>
+Output
+</h2>
+<p>
+The output should be a sequence of lines as described above,
+followed by the identifier cross-reference table.
+As noted, you should not print a cross-reference header
+if there are no identifiers to be printed.
+<h2>
+Hints on development
+</h2>
+<p>
+Start with the scanner code in the scanner
+<a href="../../Examples/Scanner/Help"><tt>Help</tt></a> directory.
+Decide on your FSM states early in the development cycle.
+Your choices may profoundly affect your coding.
+Do not carry out the following steps
+until you have previous work done and tested:
+<ol>
+<li>
+distinguishing between identifiers and reserved words
+<li>
+handling one- and two-character tokens
+<li>
+distinguishing between integers and reals
+<li>
+handling quoted strings
+<li>
+handling comments
+<li>
+building the cross-reference lists
+for identifiers
+<li>
+sorting the identifiers and printing the cross-reference table
+</ol>
+<h2>
+Extra credit
+</h2>
+<p>
+You may add the following features for extra credit:
+<ol>
+<li>
+reals in scientific notation
+(see the ISO Pascal documentation to see
+how these are defined)
+<li>
+Comments of the form <samp>(* . . . *)</samp>
+</ol>
+</body>
+</html>
