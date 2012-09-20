@@ -2,13 +2,14 @@ This program tests to see if an ID is recognized
 IDs consist of a letter followed by anynumber of 
 alpha-numerical characters and '_'
 
-a1
-2a
-a/
+a1 \\ids must start with a letter character
+A1
+2a \\ make sure this doesn't get considered one ID
+a/ \\ '/' are not valid id characters
 /a
-a23498739skajdfh98shadfkljh39r8halksdfjh92384y
-d0289347
-program
-_a
+a23_______498739skajdfh98shadfkljh39r8halksdfjh92384y \\a long id
+d0289347_ \\
+program \\make sure reserved words are not considered ids
+_a \\ids must start with a letter
 
 

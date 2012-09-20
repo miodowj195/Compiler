@@ -1,0 +1,16 @@
+This readme is intended to give a general overview of the folders
+and files in this directory. 
+
+	463.jar - a jar containing utilites needed for proper functioning
+						of this project
+
+	src - all the source code
+
+	scanner.sh - a script used to build, run, and clean the project
+
+	tests - a folder containing all the tests that were used
+					in the creation of this project to ensure proper
+					functionality.
+
+	README - This file
+	

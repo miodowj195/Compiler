@@ -1,8 +1,9 @@
 This is a test for ints. Ints are defined as any continuous string of
 numbers.
 
-1
-12312487394839529350873450873409572345
-12319;2037120310392810923;;12309120398
-871.12312
-1 13
+1 \\hard to screw this one up
+12312487394839529350873450873409572345 \\a large int
+12319;2037120310392810923;;12309120398 \\invaid int characters, this should result in 3
+																			 \\distinct ints
+871.12312 \\ a real, not an int
+1 13 \\make sure white space matters

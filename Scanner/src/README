@@ -14,6 +14,8 @@ Descriptions
 
 	README							- This file.
 
+	scanner.html				- The project description.
+
 	Scanner.java		 		- This class is used to drive the finite state machines found in TokenReader.java
 										 		and then handle it's output with a cross reference table, which behaves 
 										 		as per the inlcuded assignment instructions.

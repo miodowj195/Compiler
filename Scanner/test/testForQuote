@@ -6,11 +6,12 @@ STRING ::= QUOTE <character>^ QUOTE
 Single quote symbols can be escaped with aleading '. Any quote that is 
 not terminated before EOF or line boundary is considered to be an ESTRING
 
-' quote '
-' '
-' '' '
-' equote
-junk
-''''
-'''
+'' \\an empty quote
+' quote ' \\ tok.val should be  quote 
+' ' \\make sure that whitespace matters
+' '' ' \\an escaped interior quote
+' equote \\duh
+junk \\make sure the quote above doesn't span lines
+'''' \\should be estring with '  
+''' \\string with ' inside
 

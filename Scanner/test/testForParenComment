@@ -1,0 +1,20 @@
+This is a test for a comment they are of the form '(* <comments> *)'
+They can span one line or multiple, however, only the first line of 
+text will be stored in the tok.str field of the token. Any token that 
+does not terminate before EOF is considered an ECOMMENT
+
+
+(**) \\ the empty comment
+(* test *) \\tok.str should be 'test'
+( test *) \\ shouldn't be a comment
+(*test*) \\makes sure whitespace doesn't matter
+(* te*st *) \\makes sure that *s inside the 
+						\\comment don't prematurely end the comment
+(* multi
+	line 
+comment
+*)		\\should only contain multi in tok.str
+
+(* ecomment *
+
+\\should result in an comment

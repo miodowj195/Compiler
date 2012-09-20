@@ -1,7 +1,12 @@
-program
-PROGRAM
+This test file ensures that tokens matching the reserved word list are
+created as such. Please see the documentation on Token.java and 
+scanner.html for what it means to be a reserved word
+
+program 
+PROGRAM //make sure that case doesn't matter
 PRoGRAM
-_PROgram
-P_rogram
-P ROGRAM
+_PROgram //make sure the leading _ is caught 
+P_rogram //NOT a reserved word
+P ROGRAM //make sure whitespace matters
+programa //oops! a spelling mistake
 
