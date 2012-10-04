@@ -1,0 +1,62 @@
+# pseudo-ops
+pseudo	DW
+pseudo	DS
+pseudo	EQU
+pseudo	PUBLIC
+pseudo	EXTERN
+pseudo	ENTRY
+# Extended Stack Machine opcodes and operands
+0	BKPT	         
+1	PUSH	addr
+2	PUSHV	value   
+3	PUSHS	    	   
+# INDIR is a synonym for PUSHS
+3	INDIR
+4	PUSHX	addr    
+5	POP	addr      
+6	POPS	         
+7	POPX	addr     
+8	DUPL	         
+9	SWAP	         
+10	OVER	         
+11	DROP	         
+12	ROT	          
+13	TSTLT	        
+14	TSTLE	        
+15	TSTGT	        
+16	TSTGE	        
+17	TSTEQ	        
+18	TSTNE	        
+19	BNE	addr      
+# BT is a synonym for BNE
+19	BT	addr
+20	BEQ	addr      
+# BF is a synonym for BEQ
+20	BF	addr
+21	BR	addr       
+22	CALL	addr     
+23	CALLS
+24	RETURN	       
+# POPPC is a synonym for RETURN
+24	POPPC
+25	RETN	value    
+26	HALT	         
+27	ADD	          
+28	SUB	          
+29	MUL	          
+30	DIV	          
+31	MOD	          
+32	OR		          
+33	AND	          
+34	XOR	          
+35	NOT	          
+36	NEG	          
+37	ADDX	addr     
+38	ADDSP	value   
+39	READ	         
+40	PRINT	        
+41	READC	        
+42	PRINTC	       
+43	TRON	         
+44	TROFF	        
+45	DUMP	         

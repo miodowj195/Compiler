@@ -1,0 +1,27 @@
+EOF,	// end-of-file
+OP0,	// opcodes with zero operands
+OP1,	// opcodes with one operand
+DS,	// define storage
+DW,	// define word(s)
+EQU,
+PUBLIC,
+EXTERN,
+ENTRY,
+PLUS,	// '+'
+MINUS,	// '-'
+TIMES,	// '*'
+DIVIDE,	// '/'
+MOD,	// '%'
+LPAREN,	// '('
+RPAREN,	// ')'
+COMMA,	// ','
+COLON,	// ':'
+CHAR,	// '<any printable character or escape seq>
+ECHAR,	// '<non-printable char or illegal escape seq>
+STRING,	// "..."
+ESTRING,// non-terminated string or one with illegal escape seq.
+ID,	// identifier
+INT,	// octal, decimal, or hex
+DOLLAR,	// '$'
+NEWLINE,// '\n'
+ERROR	// anything else!

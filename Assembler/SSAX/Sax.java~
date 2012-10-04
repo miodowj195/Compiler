@@ -1,0 +1,718 @@
+import cis463.util.*;
+import cis463.fsm.*;
+import java.util.*;
+import java.io.*;
+import java.text.SimpleDateFormat;
+import gnu.getopt.Getopt;
+
+public class Sax {
+
+    public class LstItem {
+
+	public int lno;
+	public int lc;
+	public Integer oper;
+	public Value opnd;
+	public String src;
+
+	public LstItem() {
+	    lno = lio.getLineNumber();
+	    lc = LC;
+	    oper = null;
+	    opnd = null;
+	    src = lio.getLine();
+	}
+
+	public void write() {
+	    if (lst == null || pass != 2)
+		return; // no list file
+	    if (lno > 0)
+		lst.printf("%5d: %7d ", lno, lc);
+	    else
+		lst.printf("  EOF: %7d ", lc);
+	    if (oper != null)
+		lst.printf("%2d ", oper);
+	    else
+		lst.printf("%2s ", "");
+	    if (opnd != null) {
+		if (opnd == Value.UNDEF)
+		    lst.printf("%12s  ", "UNDEF");
+		else if (opnd.isExtern()) {
+		    lst.printf("%12dE ", opnd.getVal());
+		} else {
+		    lst.printf("%12d%c ",
+			       opnd.getVal(),
+			       (opnd.getTag() == 0) ? ' ' : 'R');
+		}
+	    } else
+		lst.printf("%14s", "");
+	    if (src != null)
+		lst.println(src);
+	    else
+		lst.println();
+	    src = null;
+	}
+    }
+
+    public LineIO lio;
+    public FileReader rdr;
+    public PrintStream lst; // the listing file
+    public LstItem lstItem; // what to list
+    public StreamReader<Token> tokio;
+    public Lazy<Token> lztok;
+    public int pass;
+    public boolean legacy = false;  // generate legacy (non-CALLS) code?
+    public String localLabelPrefix; // last non-local label 
+    public Map<String, Value> symtab;
+    public Map<String, Xref> xreftab;
+    public List<Integer> relocationDictionary;
+    public String entryID; // the named entry point
+    public List<String> publicList;
+    public List<String> externList;
+    public String list;    // name of list file
+    public String out;     // name of object module output file
+    public String prog;    // name of source file
+    public Sax sax;        // it's all about me, me, me!!
+    public int errorCount; // count of syntax errors (don't do pass 2 if >0)
+    public List<String> errorList;   // current line error messages
+    public List<String> messageList; // current line information messages
+    public boolean messages;         // print information messages?
+
+    public Sax (String list,
+		String out,
+		String prog,
+		boolean legacy,
+		boolean messages) {
+	this.list = list;
+	this.out = out;
+	this.prog = prog;
+	this.legacy = legacy;
+	this.messages = messages;
+	// lst = System.err; // list file, for now
+	errorCount = 0;
+	messageList = new ArrayList<String>();
+	errorList = new ArrayList<String>();
+        symtab = new HashMap<String, Value>();
+	xreftab = new HashMap<String, Xref>();
+	relocationDictionary = new ArrayList<Integer>();
+	publicList = new ArrayList<String>();
+	externList = new ArrayList<String>();
+	symtab.put("SP", new Value.Defined(0));
+	sax = this;
+    }
+
+    // for testing purposes
+    public Sax() {
+        this.list = null;
+        this.out = null;
+        this.prog = null;
+	errorCount = 0;
+	messageList = new ArrayList<String>();
+	errorList = new ArrayList<String>();
+        symtab = new HashMap<String, Value>();
+	relocationDictionary = new ArrayList<Integer>();
+	symtab.put("SP", new Value.Defined(0));
+        sax = this;
+    }
+
+    private String label;   // the label at the beginning of a line, if any
+    public int LC;          // the current location counter
+    public int startLC;     // the LC at the beginning of a line
+
+    // evaluate an expression,
+    //returning null if there's an error
+    private Value eval() {
+	try {
+	    Value v = new Eval(this).eval();
+	    return v;
+	} catch (Exception e) {
+	    // we get here in case of an expression syntax error
+	    return null;
+	}
+    }
+
+    // beginning of line
+    FSMState sax_INIT = new FSMState() {
+	    public FSMState next() {
+		resetMessageList();
+		resetErrorList();
+		label = null;
+		startLC = LC;
+		Token tok = CUR();
+		lstItem = new LstItem();
+		if (tok.val == Token.Val.EOF) {
+		    lstItem.lno = -1; // marks EOF
+		    lstItem.write();
+		    return null; // end of this pass!
+		}
+		if (tok.val == Token.Val.ID) {
+		    ADV();
+		    // this is in label position
+		    label = tok.str.toString();
+		    if (!isLocal(label))
+			localLabelPrefix = label;
+		    return sax_ID;
+		}
+		return sax_OP;
+	    }
+	};
+
+    FSMState sax_EAT = new FSMState() {
+	    public FSMState next() {
+		err("... skipping ...");
+		// avoid an extra FSM state
+		while(true) {
+		    Token tok = CUR();
+		    if (tok.val == Token.Val.NEWLINE)
+			return sax_NL;
+		    ADV();
+		}
+	    }
+	};
+
+    FSMState sax_NL = new FSMState() {
+	    public FSMState next() {
+		Token tok = CUR();
+		if (tok.val == Token.Val.NEWLINE) {
+		    ADV();
+		    if (lstItem.src != null)
+			lstItem.write(); // write out the list line
+		    if (messages)
+			printMessageList();
+		    printErrorList();
+		    return sax_INIT;
+		}
+		err(tok + ": unexpected token");
+		return sax_EAT;
+	    }
+	};
+
+    FSMState sax_ID = new FSMState() {
+	    public FSMState next() {
+		Token tok = CUR();
+		// label is guaranteed to be non-null here
+		if (tok.val == Token.Val.EQU) {
+		    ADV();
+		    Value val = eval();
+		    if (val == null)
+			return sax_EAT; // syntax error in expression
+		    symtabPut(label, val);
+		    lstItem.opnd = val;
+		    // System.err.println(label + " EQU " + val);
+		    return sax_NL;
+		}
+		if (tok.val == Token.Val.COLON) {
+		    ADV();
+		    symtabPut(label, new Value.Defined(1, LC));
+		    return sax_OP;
+		}
+		return sax_EAT;
+	    }
+	};
+
+    FSMState sax_OP = new FSMState() {
+	    public FSMState next() {
+		Token tok = CUR();
+		if (tok.val == Token.Val.OP0) {
+		    emitOp(tok.opcode);
+		    ADV();
+		    return sax_NL;
+		}
+		if (tok.val == Token.Val.OP1) {
+		    ADV();
+		    emitOp(tok.opcode);
+		    // System.out.println("... evaluating the operand ...");
+		    Value val = eval(); // evaluate the operand
+		    if (val == null)
+			return sax_EAT; // syntax error
+		    emitVal(val);
+		    return sax_NL;
+		}
+		if (tok.val == Token.Val.DW) {
+		    ADV();
+		    return sax_DWS; // this handles multiple DW operands
+		}
+		if (tok.val == Token.Val.DS) {
+		    ADV();
+		    Value val = eval();
+		    if (val == null)
+			return sax_EAT;
+		    if (! val.isAbsolute())
+			err(val + ": DS argument not absolute");
+		    else
+			emitDS(val.getVal());
+		    return sax_NL;
+		}
+		if (tok.val == Token.Val.EXTERN) {
+		    ADV();
+		    return sax_EXTERNS;
+		}
+		if (tok.val == Token.Val.PUBLIC) {
+		    ADV();
+		    return sax_PUBLICS;
+		}
+		if (tok.val == Token.Val.ENTRY) {
+		    ADV();
+		    return sax_ENTRY;
+		}
+		return sax_NL;
+	    }
+	};
+
+    public FSMState sax_DWS = new FSMState() {
+	    public FSMState next() {
+		Token tok = CUR();
+		if (tok.val == Token.Val.STRING) {
+		    // System.err.println("... string=" + tok.str + " ...");
+		    ADV();
+		    processString(tok.str.toString());
+		    // emit the individual characters in the string
+		} else {
+		    Value val = eval();
+		    if (val == null) // expression syntax error
+			return sax_EAT;
+		    emitVal(val);
+		    lstItem.write(); // don't wait until a newline!
+		}
+		// skip an FSM state ...
+		tok = CUR();
+		if (tok.val == Token.Val.COMMA) {
+		    ADV();
+		    return this;
+		}
+		return sax_NL;
+	    }
+	};
+
+    public FSMState sax_EXTERNS = new FSMState() {
+	    public FSMState next() {
+		Token tok = CUR();
+		if (tok.val != Token.Val.ID) {
+		    err(tok + ": EXTERN label expected");
+		    return sax_EAT;
+		}
+		ADV();
+		String id = tok.str.toString();
+		if (isLocal(id))
+		    err(id + ": local label cannot be marked as EXTERN");
+		else if (pass == 1) {
+		    symtabPut(id, new Value.Extern(id));
+		    externList.add(id);
+		}
+		// loop back for more EXTERNs
+		tok = CUR();
+		if (tok.val == Token.Val.COMMA) {
+		    ADV();
+		    return this;
+		}
+		return sax_NL;
+	    }
+	};
+
+    public FSMState sax_PUBLICS = new FSMState() {
+	    public FSMState next() {
+		Token tok = CUR();
+		if (tok.val != Token.Val.ID) {
+		    err(tok + ": PUBLIC label expected");
+		    return sax_EAT;
+		}
+		ADV();
+		String id = tok.str.toString();
+		if (isLocal(id))
+		    err(id + ": local label cannot be marked as PUBLIC");
+		else if (pass == 1)
+		    addToPublics(id);
+		// loop back for more PUBLICSs
+		tok = CUR();
+		if (tok.val == Token.Val.COMMA) {
+		    ADV();
+		    return this;
+		}
+		return sax_NL;
+	    }
+	};
+
+    public FSMState sax_ENTRY = new FSMState() {
+	    public FSMState next() {
+		Token tok = CUR();
+		if (tok.val != Token.Val.ID) {
+		    err(tok + ": ENTRY label expected");
+		    return sax_EAT;
+		}
+		ADV();
+		String id = tok.str.toString();
+		if (isLocal(id))
+		    err(id + ": local label cannot be marked as ENTRY");
+		else if (pass == 1) {
+		    if (entryID != null)
+			err(entryID + ": multiple ENTRY declaractions");
+		    else {
+			entryID = id;
+			addXref(id);
+		    }
+		} else {
+		    // pass == 2
+		    Value entryLoc = symtab.get(id);
+		    if (entryLoc == null)
+			err(id + ": undefined ENTRY location");
+		    else
+			lstItem.opnd = entryLoc;
+		} 
+		return sax_NL;
+	    }
+	};
+
+    public Token CUR() {
+	Token t = lztok.cur();
+	// System.out.println("token: [" + t + "]");
+	return t;
+    }
+
+    public void ADV() {
+	lztok.adv();
+    }
+
+    // emit an opcode
+    public void emitOp(int op) {
+	// use legacy opcodes (no CALLS instruction)
+	if (legacy) {
+	    if (op == 23)
+		err(op + ": illegal legacy opcode");
+	    else if (op > 23)
+		op--;
+	}
+	if (pass == 2) {
+	    lstItem.oper = new Integer(op);
+	    System.out.println(op);
+	}
+	LC++;
+    }
+    
+    // emit an operand value -- may be absolute, relative or extern
+    public void emitVal(Value v) {
+	if (pass == 2) {
+	    lstItem.opnd = v;
+	    if (v == Value.UNDEF) {
+		err(v + ": undefined operand value");
+	    } else {
+		if (v.isRelative())
+		    addReloc(LC); // add to relocation dictionary
+		else if (v.isExtern())
+		    v.addLC(LC);  // add LC to the EXTERN table for this value
+		System.out.println(v.getVal());
+	    }	    
+	}
+	LC++;
+    }
+
+    // emit a DS value (a colon followed by a positive integer value)
+    public void emitDS(int ds) {
+	if (ds <= 0) {
+	    err(ds + ": illegal DS value");
+	    return;
+	} else if (pass == 2) {
+	    lstItem.opnd = new Value.Defined(ds);
+	    System.out.println(":" + ds);
+	}
+	LC += ds;
+    }
+
+    public String doLabelPrefix(String s) {
+	if (isLocal(s))
+	    s = localLabelPrefix + s;
+	return s;
+    }
+
+    // Note: All labels that appear in label position will be
+    // in the symbol table at the end of pass 1.
+    // In pass 2, all labels that appear in label position will
+    // be re-evaluated (possibly still UNDEF).
+    // This method handles local labels by appending the local label prefix
+    public void symtabPut(String s, Value v) {
+	s = doLabelPrefix(s);
+	setXref(s);
+	// System.err.println("... put("+s+","+v+") ...");
+	Value vv = symtab.get(s);
+	if (vv != null && pass == 1)
+	    err(s + ": multiply defined label");
+	else
+	    symtab.put(s,v);
+    }
+
+    // This method handles local labels by appending the local label prefix
+    public Value symtabGet(String s) {
+	s = doLabelPrefix(s);
+	addXref(s);
+	Value v = symtab.get(s);
+	if (v == null)
+	    v = Value.UNDEF;
+	// System.err.println("... get("+s+") => "+v+" ...");
+	return v;
+    }
+
+    // get the Xref entry for this symbol,
+    // creating a new one if necessary
+    public Xref xreftabGet(String s) {
+	// assumes that s already has an appropriate label prefix
+	Xref xref = xreftab.get(s);
+	if (xref == null) {
+	    xref = new Xref();
+	    xreftab.put(s, xref);
+	}
+	return xref;
+    }
+
+    // add the current line number to the Xref entries for this label
+    public void addXref(String s) {
+	// assumes that s already has an appropriate label prefix
+	if (pass == 1)
+	    xreftabGet(s).addXref(lio.getLineNumber());
+    }
+
+    // mark this label as being defined at the current line number
+    public void setXref(String s) {
+	// assumes that s already has an appropriate label prefix
+	if (pass == 1)
+	    xreftabGet(s).setXref(lio.getLineNumber());
+    }
+
+    public void processString(String s) {
+	int len = s.length();
+	for (int i=0 ; i<len ; i++) {
+	    Value v = new Value.Defined((int)s.charAt(i)); // never relocatable
+	    lstItem.opnd = v;
+	    lstItem.write(); // don't wait for end of line
+	    emitVal(v);
+	}
+    }
+
+    public void addReloc(int lc) {
+	relocationDictionary.add(lc);
+    }
+
+    public void addToPublics(String s) {
+	publicList.add(s);
+    }
+
+    public String formatMsg(String s) {
+	return "[" + lio.getLineNumber() + "]>>> " + s;
+    }
+
+    // add an information string to the message list
+    public void msg(String s) {
+	messageList.add(formatMsg(s));
+    }
+
+    // add an error string to the error list and increment the error counter
+    public void err(String s) {
+	errorList.add(formatMsg(s));
+	errorCount++;
+    }
+
+    public void resetMessageList() {
+	messageList.clear();
+    }
+
+    public void resetErrorList() {
+	errorList.clear();
+    }
+
+    public void printMessageList() {
+	for (String s : messageList)
+	    System.err.println(s);
+    }
+
+    public void printErrorList() {
+	for (String s : errorList)
+	    System.err.println(s);
+    }
+
+    public boolean isLocal(String s) {
+	return s.charAt(0) == '@';
+    }
+
+    public void rdrOpen() {
+	try {
+	    rdr = new FileReader(prog);
+	} catch (Exception e) {
+	    System.err.println(e + " -- assembly aborted");
+	    System.exit(1);
+	}
+    }
+
+    public void rdrClose() {
+	try {
+	    rdr.close();
+	} catch (Exception e) {
+	    System.err.println(e + " -- assembly aborted");
+	    System.exit(1);
+	}
+    }
+
+    public void run() {
+	if (out != null) {
+	    try {
+		System.setOut(new PrintStream(out));
+	    } catch (FileNotFoundException e) {
+		System.err.println(out+": cannot create object file for writing");
+		System.exit(1);
+	    }
+	}
+	if (list != null) {
+	    try {
+		lst = new PrintStream(list);
+	    } catch (FileNotFoundException e) {
+		System.err.println(list+": cannot create list file for writing");
+		System.exit(2);
+	    }
+	}
+	entryID = null;
+	for (pass=1 ; pass <= 2 ; pass++) {
+	    errorCount = 0;
+	    if (pass == 2) {
+		String xx = legacy ? "-" : "+";
+		System.out.println("%SXX" + xx + "Object Module");
+		System.out.println("# Object module for file " + prog);
+		SimpleDateFormat udf = // Unix date format
+		    new SimpleDateFormat("EEE MMM dd HH:MM:SS z yyyy");
+		String now = udf.format(Calendar.getInstance().getTime());
+		System.out.println("# " + now);
+		System.out.println(LC + " text length");
+		System.out.println("% text");
+	    }
+	    localLabelPrefix = "";
+	    LC = 0;
+	    lio = null;
+	    rdrOpen();
+	    lio = new LineIO(rdr);
+	    tokio = new TokenReader(lio);
+	    lztok = new Lazy<Token>(tokio);
+	    FSM.run(sax_INIT);
+	    rdrClose();
+	    if (errorCount > 0) {
+		System.err.println("Pass "
+				   +pass
+				   +" errors encountered ... exiting");
+		System.exit(2);
+	    }
+	}
+	System.out.println("% relocation dictionary");
+	for (Integer r : relocationDictionary)
+	    System.out.println(r);
+	System.out.println("% ENTRY, EXTERN, and PUBLIC references");
+	errorCount = 0;
+	resetErrorList();
+	if (entryID != null) {
+	    Value v = symtab.get(entryID);
+	    if (v == null)
+		err(entryID + ": ENTRY label is not defined");
+	    else if (! v.isRelative())
+		err(entryID + ": label does not evaluate to a relocatable");
+	    else {
+		int entryLoc = v.getVal();
+		System.out.println("ENTRY " + entryID + " " + entryLoc);
+	    }
+	}
+	for (String s : publicList) {
+	    Value v = symtab.get(s);
+	    if (v == null)
+		err(s + ": PUBLIC label is not defined");
+	    else if (! v.isRelative())
+		err(s + ": label does not evaluate to a relocatable");
+	    else
+		System.out.println("PUBLIC " + s + " " + v.getVal());
+	}
+	for (String s : externList) {
+	    Value v = symtab.get(s);
+	    if (v == null)
+		err(s + ": EXTERN label is not defined");
+	    else if (! v.isExtern())
+		err(s + ": label does not evaluate to an Extern");
+	    else {
+		Value.Extern ext = (Value.Extern)v; // cast
+		List<Integer> fixupList = ext.fixupList;
+		if (fixupList.size() > 0) {
+		    System.out.print("EXTERN " + s);
+		    for (Integer i : fixupList)
+			System.out.print(" " + i);
+		    System.out.println();
+		}
+	    }
+	}
+	printErrorList();
+	if (errorCount > 0)
+	    System.exit(3);
+	System.out.println("% end of object module");
+	if (lst == null || xreftab.size() == 0)
+	    return; // no cross-reference list
+	lst.println();
+	lst.println("Cross Reference List");
+	lst.println("--------------------");
+	lst.println("Symbol                               Value   Line Numbers");
+	lst.println("------                               -----   ------------");
+	String [] ids = xreftab.keySet().toArray(new String [0]);
+	Arrays.sort(ids);
+	for (String s : ids) {
+	    Xref xref = xreftab.get(s);
+	    String ss = s;
+	    int nn = s.indexOf("@");
+	    if (nn > 0)
+		ss = s.substring(nn);
+	    lst.printf("%-30s", ss);
+	    Value v = symtab.get(s);
+	    if (v == null)
+		v = Value.UNDEF;
+	    String sv = "";
+	    if (v == Value.UNDEF)
+		sv = "UNDEF ";
+	    else if (v.isExtern())
+		sv = "EXTERN ";
+	    else
+		sv = v.getVal() + ((v.getTag() == 0) ? " " : "R");
+	    lst.printf("%13s|", sv);
+	    int defined = xref.defined;
+	    int count = 0;
+	    for (Integer i : xref.xrefList) {
+		if (count >= 5) {
+		    lst.printf("%45s", ""); // 45 spaces
+		    count = 0;
+		}
+		lst.printf(" %5d", i);
+		lst.print( (i == defined) ? '*' : ' ');
+		count++;
+	    }
+	    lst.println();
+	}
+    }
+
+    public static void main(String [] args) {
+	Getopt g = new Getopt("Sax", args, "l:o:xm");
+	String prog = null;
+	String list = null;
+	String out = null;
+	boolean legacy = false;
+	boolean messages = false;
+	int c;
+	String usage = "usage: sax [-l <list>] [-o <obj>] prog";
+	while ((c = g.getopt()) != -1) {
+	    switch((char)c) {
+	    case 'l': list = g.getOptarg(); break;
+            case 'o': out = g.getOptarg(); break;
+	    case 'x': legacy = true; break;
+	    case 'm': messages = true; break;
+	    default:
+		System.err.println(usage);
+		System.exit(1);
+	    }
+	}
+	int optind = g.getOptind();
+	if (optind != args.length-1) {
+	    System.err.println(usage);
+	    System.exit(1);
+	}
+	prog = args[optind];
+	// System.err.println("list=" + list + " out=" + out + " prog=" + prog);
+	Sax sax = new Sax(list, out, prog, legacy, messages);
+	sax.run();
+    }
+}

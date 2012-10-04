@@ -1,0 +1,49 @@
+This directory contains files that you should use as a starting point for
+writing your assembler.
+
+The mkOptab.pl perl script takes input from the 'opcodes' file and
+generates a file 'Optab.java'.  The 'check' method in the Optab class can
+be used to determine if a token is an identifier (or 'label' in
+common assembly terminology), an opcode, or a "pseudo-op".  The OP0
+token represents all opcodes that take no operands, and the OP1 token
+represents all opcodes that take one operand.  Other than the actual
+opcode itself (a number from 0 to 45), all OP0 and OP1 tokens look alike.
+
+Be sure to test your TokenReader behavior using the Scanner test harness.
+Do not continue until you have a completely functional TokenReader.
+
+The 'Value' class is used to instantiate the three possible value types
+that the assembler uses: Defined (absolute and relative), Extern, and
+Undef.  Each of these is represented by an inner class, so that a
+Defined object can be instantiated, for example, using
+
+    'new Value.Defined(...)'
+
+This class also defines what it means to add (subtract, multiply, etc.)
+this Value to other Values.  Only some of these operations are implemented.
+The rules for combining EXTERNs with absolutes are also implemented here.
+
+The 'Eval' class is used to parse and evaluate expressions involving
+Values.  Only some of the FACTOR expressions are implemented here.  You
+will need to do the rest.
+
+The Sax class is the guts of the assembler.  It does the two passes,
+including gathering all of the labels in pass 1 and associating them
+with their appropriate Values (possibly UNDEF), and then evaluating
+all of the Values again in pass 2, fixing those labels that were UNDEF
+in pass 1 if possible.  Pass 2 will also generate an object module
+in the correct format.  The 'emit' methods will pump out the proper
+output to the object module in pass 2.
+
+Error handling is done structurally (using the FSMs to determine if
+the wrong token is discovered) or semantically (attempting to emit an
+object module value that is undefined).  Structural errors will always
+be found in pass 1, but semantic errors will usually crop up in pass 2.
+The one semantic error that MUST be found in pass 1 is that in a DS
+directive, the operand Value must be defined and absolute.
+
+Producing the listing file will be the most challenging.  The listing
+format should be similar to the behavior of the reference implementation,
+but you have some freedom as to exactly how you want your output to look.
+Wait until pass 1 to produce your listing file; if there are errors in
+pass 1, don't attempt pass 2.
