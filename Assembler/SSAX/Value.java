@@ -79,209 +79,209 @@ public abstract class Value {
     int len = s.length();
     if (s == null || len == 0)
       throw new NumberFormatException("zero-length string");
-    return 0; /* FIXME */
+     /* FIXME */
+  
+    if(s.charAt(0) ==  '0' && len == 1)
+    return 0;
 
-    if(s.equals(0))
-      return 0;
+  if(s.toUpperCase().startsWith("0X"))
+    return Integer.parseInt(s.substring(2,len), 16);	
 
-    if(s.toUpperCase().startsWith("0X"))
-      return Integer.parseInt(s.substring(2,len), 16);	
+  if(s.startsWith("0"))
+    return Integer.parseInt(s.substring(1,len), 8);
 
-    if(s.startsWith("0"))
-      return Integer.parseInt(s.substring(1,len), 8);
+  if(s.startsWith("\'"))
+    return (int)s.charAt(1);
 
-    if(s.startsWith("\'"))
-      return (int)s.charAt(1);
+  return Integer.parseInt(s);
 
-    return Integer.parseInt(s);
+  // you may want to use the Integer.parseInt static method
+  // to handle the various bases of hex, octal, and decimal (default).
+}
 
-    // you may want to use the Integer.parseInt static method
-    // to handle the various bases of hex, octal, and decimal (default).
+public static final Value UNDEF = new Undef(); // a "singleton"
+
+public boolean isDefined() {
+  return this instanceof Defined;
+}
+
+public boolean isExtern() {
+  return this instanceof Extern;
+}
+
+public void addFixup(int LC) {
+  throw new RuntimeException(this + ": not an EXTERN Value");
+}
+
+public static class Defined extends Value {
+
+  private int tag;   // 0=absolute, 1=relocatable
+  private int val;   // the value
+
+  public Defined(int tag, int val) {
+    this.tag = tag;
+    this.val = val;
   }
 
-  public static final Value UNDEF = new Undef(); // a "singleton"
-
-  public boolean isDefined() {
-    return this instanceof Defined;
+  // used to construct a Value with absolute tag
+  public Defined(int val) {
+    this.tag = 0;
+    this.val = val;
   }
 
-  public boolean isExtern() {
-    return this instanceof Extern;
+  public Value add(Sax sax, Value v) {
+    if (! v.isDefined()) {
+      sax.msg(v+": cannot appear as second argument to add");
+      return UNDEF;
+    }
+    return new Defined(tag + v.getTag(), val + v.getVal());
+  }
+
+  /****/
+  public Value sub(Sax sax, Value v) {
+    /* FIXME */
+    if (! v.isDefined()) {
+      sax.msg(v+": cannot appear as second argument to subtract");
+      return UNDEF;
+    }
+    return new Defined(tag - v.getTag(), val - v.getVal());
+  }
+
+  public Value mul(Sax sax, Value v) {
+    /* FIXME */
+    // both arguments to the multiply operation
+    // must be Defined and absolute
+    if(! v.isDefined()) {
+      sax.msg(v+": cannot appear as second argument to multiply");
+      return UNDEF;
+    }
+    //ensure that both values are absolute
+    if(v.getTag()!=0 || this.getTag() != 0){
+      sax.msg("The tags for either " + v + " or " + this + " are not absolute");
+      return UNDEF;
+    }
+    return new Defined(tag, this.val*v.getVal());
+  }
+
+  public Value div(Sax sax, Value v) {
+    /* FIXME */
+    if(! v.isDefined()){
+      sax.msg(v+": cannot appear as second argument to divide");
+      return UNDEF;
+    }
+    //check for divide by zero
+    if(v.getVal() == 0){
+      sax.msg(v+": Cannot divide by zero"); 
+    }
+    return new Defined(tag, this.val/v.getVal()); 
+  }
+
+  public Value mod(Sax sax, Value v) {
+    /* FIXME */
+    if(! v.isDefined()){
+      sax.msg(v+": cannot appear as second argument to modulo");
+      return UNDEF;
+    }
+    //check for divide by zero
+    if(v.getVal() == 0){
+      sax.msg(v+": Cannot modulo by zero"); 
+    }
+
+    return new Defined(tag, this.val%v.getVal()); 
+
+  }
+
+  public Value neg(Sax sax) {
+    return new Defined(-tag, -val);
+  }
+
+  public int getTag() {
+    return tag;
+  }
+
+  public int getVal() {
+    return val;
+  }
+
+  public String toString() {
+    return "DEFINED: [tag="+tag+" val="+val+"]";
+  }
+}
+
+private static class Undef extends Value {
+  public String toString() {
+    return "UNDEF";
+  }
+}
+
+public static class Extern extends Value {
+
+  public String label;
+  // fixupList gives the object module locations
+  // where the EXTERN label is found and must be fixed up
+  // at link time
+  public List<Integer> fixupList;
+  // when fixed up a link time, this offset is added to
+  // the addres of the external label
+  public int offset;
+
+  // used only when declaring a label to be EXTERN
+  public Extern(String label) {
+    this.label = label;
+    fixupList = new ArrayList<Integer>();
+    this.offset = 0;
+  }
+
+  // used to instantiate the Value of an EXTERN [+-] abs expression;
+  // the ext parameter refers to the EXTERN part of this expression
+  // so that this EXTERN can access the label and its fixupList
+  private Extern(Extern ext, int offset) {
+    // ext is the extern to be operated on
+    this.label = ext.label;
+    this.fixupList = ext.fixupList;
+    this.offset = offset;
+  }
+
+  public Value add(Sax sax, Value v) {
+    if (! v.isDefined()) {
+      sax.msg(v+": cannot appear in expression EXTERN+val");
+      return UNDEF;
+    }
+    if (! v.isAbsolute()) {
+      sax.msg(v + ": val non-absolute in expression EXTERN+val");
+      return UNDEF;
+    }
+    return new Extern(this, offset + v.getVal());
+  }
+
+  public Value sub(Sax sax, Value v) {
+    /* FIXME */
+    if(! v.isDefined()){
+      sax.msg(v+": cannot appear in expression EXTERN-val");
+      return UNDEF;
+    }
+    if (! v.isAbsolute()) {
+      sax.msg(v + ": val non-absolute in expression EXTERN-val");
+      return UNDEF;
+    }
+    return new Extern(this, offset - v.getVal());
+  }
+
+  public int getVal() {
+    return offset;
+  }
+
+  public int getTag() {
+    return 0; // implicitly absolute
   }
 
   public void addFixup(int LC) {
-    throw new RuntimeException(this + ": not an EXTERN Value");
+    fixupList.add(LC);
   }
 
-  public static class Defined extends Value {
-
-    private int tag;   // 0=absolute, 1=relocatable
-    private int val;   // the value
-
-    public Defined(int tag, int val) {
-      this.tag = tag;
-      this.val = val;
-    }
-
-    // used to construct a Value with absolute tag
-    public Defined(int val) {
-      this.tag = 0;
-      this.val = val;
-    }
-
-    public Value add(Sax sax, Value v) {
-      if (! v.isDefined()) {
-        sax.msg(v+": cannot appear as second argument to add");
-        return UNDEF;
-      }
-      return new Defined(tag + v.getTag(), val + v.getVal());
-    }
-
-    /****/
-    public Value sub(Sax sax, Value v) {
-      /* FIXME */
-      if (! v.isDefined()) {
-        sax.msg(v+": cannot appear as second argument to subtract");
-        return UNDEF;
-      }
-      return new Defined(tag - v.getTag(), val - v.getVal());
-    }
-
-    public Value mul(Sax sax, Value v) {
-      /* FIXME */
-      // both arguments to the multiply operation
-      // must be Defined and absolute
-      if(! v.isDefined()) {
-        sax.msg(v+": cannot appear as second argument to multiply");
-        return UNDEF;
-      }
-      //ensure that both values are absolute
-      if(v.getTag()!=0 || this.getTag() != 0){
-        sax.msg("The tags for either " + v + " or " + this + " are not absolute");
-        return UNDEF;
-      }
-      return new Defined(tag, this.val*v.getVal());
-    }
-
-    public Value div(Sax sax, Value v) {
-      /* FIXME */
-      if(! v.isDefined()){
-        sax.msg(v+": cannot appear as second argument to divide");
-        return UNDEF;
-      }
-      //check for divide by zero
-      if(v.getVal() == 0){
-        sax.msg(v+": Cannot divide by zero"); 
-      }
-      return new Defined(tag, this.val/v.getVal()); 
-    }
-
-    public Value mod(Sax sax, Value v) {
-      /* FIXME */
-      if(! v.isDefined()){
-        sax.msg(v+": cannot appear as second argument to modulo");
-        return UNDEF;
-      }
-      //check for divide by zero
-      if(v.getVal() == 0){
-        sax.msg(v+": Cannot modulo by zero"); 
-      }
-
-      return new Defined(tag, this.val%v.getVal()); 
-
-    }
-
-    public Value neg(Sax sax) {
-      return new Defined(-tag, -val);
-    }
-
-    public int getTag() {
-      return tag;
-    }
-
-    public int getVal() {
-      return val;
-    }
-
-    public String toString() {
-      return "DEFINED: [tag="+tag+" val="+val+"]";
-    }
+  public String toString() {
+    return "EXTERN: [label="+label+" offset="+offset+"]";
   }
-
-  private static class Undef extends Value {
-    public String toString() {
-      return "UNDEF";
-    }
-  }
-
-  public static class Extern extends Value {
-
-    public String label;
-    // fixupList gives the object module locations
-    // where the EXTERN label is found and must be fixed up
-    // at link time
-    public List<Integer> fixupList;
-    // when fixed up a link time, this offset is added to
-    // the addres of the external label
-    public int offset;
-
-    // used only when declaring a label to be EXTERN
-    public Extern(String label) {
-      this.label = label;
-      fixupList = new ArrayList<Integer>();
-      this.offset = 0;
-    }
-
-    // used to instantiate the Value of an EXTERN [+-] abs expression;
-    // the ext parameter refers to the EXTERN part of this expression
-    // so that this EXTERN can access the label and its fixupList
-    private Extern(Extern ext, int offset) {
-      // ext is the extern to be operated on
-      this.label = ext.label;
-      this.fixupList = ext.fixupList;
-      this.offset = offset;
-    }
-
-    public Value add(Sax sax, Value v) {
-      if (! v.isDefined()) {
-        sax.msg(v+": cannot appear in expression EXTERN+val");
-        return UNDEF;
-      }
-      if (! v.isAbsolute()) {
-        sax.msg(v + ": val non-absolute in expression EXTERN+val");
-        return UNDEF;
-      }
-      return new Extern(this, offset + v.getVal());
-    }
-
-    public Value sub(Sax sax, Value v) {
-      /* FIXME */
-      if(! v.isDefined()){
-        sax.msg(v+": cannot appear in expression EXTERN-val");
-        return UNDEF;
-      }
-      if (! v.isAbsolute()) {
-        sax.msg(v + ": val non-absolute in expression EXTERN-val");
-        return UNDEF;
-      }
-      return new Extern(this, offset - v.getVal());
-    }
-
-    public int getVal() {
-      return offset;
-    }
-
-    public int getTag() {
-      return 0; // implicitly absolute
-    }
-
-    public void addFixup(int LC) {
-      fixupList.add(LC);
-    }
-
-    public String toString() {
-      return "EXTERN: [label="+label+" offset="+offset+"]";
-    }
-  }
+}
 
 }

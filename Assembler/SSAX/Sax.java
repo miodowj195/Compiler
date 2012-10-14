@@ -25,6 +25,7 @@ public class Sax {
   public Sax sax;        // it's all about me, me, me!!
   public int errorCount; // count of syntax errors (don't do pass 2 if >0)
   public List<String> errorList;   // current line error messages
+  public String MRNL = null;
 
   public Sax (String list,
       String out,
@@ -121,6 +122,7 @@ public class Sax {
       if (tok.val == Token.Val.COLON) {
         ADV();
         //FIXME
+        addReloc(LC);
         symtabPut(label, new Value.Defined(1,LC));
         //TODO fixed?????????????????????????
         return sax_OP;
@@ -219,7 +221,7 @@ public class Sax {
       ADV();
       String id = tok.str.toString();
       if (pass == 1) {
-        symtabPut(id, new Value.Defined(0,LC)); /* FIXME */
+        symtabPut(id, new Value.Extern(id)); /* FIXME */
         //TODO fixed???????
         externList.add(id);
       }
@@ -348,42 +350,40 @@ public class Sax {
   // This method does not handle local labels properly /* FIXME */
   public void symtabPut(String s, Value v) {
     // System.err.println("... put("+s+","+v+") ...");
-    Value vv = symtab.get(s);
-    if (vv != null && pass == 1){
-      err(s + ": multiply defined label");
-    }else if(pass ==1){
+    if(pass ==1){
       //deal with local labels
       if(s.charAt(0) == '@'){
-        //dummy name
-        String mostRecent = "";
-        int check = -1;
-        for(String name : symtab.keySet()){
-          if(symtab.get(name).getTag() ==1){
-            if(check == -1){
-              check = v.getVal() - symtab.get(name).getVal();
-              mostRecent = name;
-            }
-            int num = v.getVal() - symtab.get(name).getVal();
-            if((num < check) && !(num < 1 )){
-              check = num;
-              mostRecent = name;
-            }
-          }
-        }
-        if(check == -1){
-          err(s + ": is not following a non-local label");
-        }
-        s = mostRecent + s;
-      }  
+        if(MRNL == null){
+          err(s + ": cannot set local label without a non local");
+        }          
+        s = MRNL + s;
+      }
+      Value vv = symtab.get(s);
+      if (vv != null && pass == 1){
+        err(s + ": multiply defined label");
+      }
+      MRNL = s;
       symtab.put(s,v);
     }
-
-    if(pass==2 && !v.isDefined())
-      err(s + ":cannot define unbound local label");
+    /*
+       if(s.charAt(0) == '@'){
+       s = MRNL + s;
+       }
+       if(!symtab.get(s).isDefined()){
+       err(s + ": UNDEF label in pass 2"); 
+       }
+     */
   }
 
   // This method does not handle local labels properly /* FIXME */
   public Value symtabGet(String s) {
+    if(isLocal(s)){
+      if(MRNL!= null){
+        s = MRNL + s;
+      }else{
+        err(s + ": no non-local label defined");
+      }
+    }
     Value v = symtab.get(s);
     if (v == null)
       v = Value.UNDEF;
@@ -395,7 +395,7 @@ public class Sax {
     int len = s.length();
     for (int i=0 ; i<len ; i++) {
       //place the ascii value of the character in the module
-      Value v = new Value.Defined(s.charAt(i));
+      Value v = new Value.Defined((int)s.charAt(i));
       emitVal(v);
     }
   }
@@ -406,6 +406,10 @@ public class Sax {
 
   public void addToPublics(String s) {
     publicList.add(s);
+  }
+
+  public void msg(String s){
+    System.out.println(s);
   }
 
   public String formatMsg(String s) {

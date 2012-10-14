@@ -20,7 +20,7 @@ public class Eval {
 
   public Value eval() {
     FSM.run(expr_EXPR);
-    Value v = stk.pop().validate(sax);
+    Value v = stk.pop().validate();
     // System.err.println("... expression value = " + v + " ...");
     return v;
   }
@@ -46,7 +46,6 @@ public class Eval {
         case MINUS: {
                       ADV();
                       /* FIXME */
-                      ADV();
                       Value x = stk.pop();
                       FSM.run(expr_TERM);
                       stk.push(x.sub(sax, stk.pop()));
