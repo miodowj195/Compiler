@@ -1,0 +1,37 @@
+%SXX+Object Module
+# Object module for file Test/fib.sax
+24 text length
+% text
+9
+40
+2
+10
+42
+24
+2
+0
+8
+22
+0
+2
+1
+8
+22
+0
+8
+12
+27
+8
+22
+0
+21
+16
+% relocation dictionary
+10
+15
+21
+23
+% ENTRY, EXTERN, and PUBLIC references
+ENTRY 6
+PUBLIC loop 16
+% end of object module

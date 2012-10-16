@@ -7,8 +7,12 @@ import gnu.getopt.Getopt;
 public class Sax {
 
 
+  public boolean op0 = false;
+  public boolean operand = false;
+  public int lineCount = 1;
   public LineIO lio;
   public FileReader rdr;
+  public BufferedReader BR;
   public PrintStream lst; // the listing file
   public StreamReader<Token> tokio;
   public Lazy<Token> lztok;
@@ -62,13 +66,22 @@ public class Sax {
 
   // beginning of line
   FSMState sax_INIT = new FSMState() {
-    public FSMState next() {
+    public FSMState next() { 
       resetErrorList();
       label = null;
       Token tok = CUR();
       if (tok.val == Token.Val.EOF) {
+        if(pass==2){
+          lst.format("%4s:", "EOF");
+          lst.format("%9d%n", LC);
+        }
         return null; // end of this pass!
       }
+      if(pass == 2){
+        lst.format("%4d:", lineCount);
+        lst.format("%9d", LC);
+      }
+
       if (tok.val == Token.Val.ID) {
         ADV();
         // this is in label position
@@ -97,8 +110,25 @@ public class Sax {
     public FSMState next() {
       Token tok = CUR();
       if (tok.val == Token.Val.NEWLINE) {
+        if(pass == 2){
+          try{
+            if(!op0){
+              lst.format("%21s", " ");
+            }
+            lst.format(" %s",BR.readLine());
+          } catch(Exception e){
+            System.err.println(e); 
+            System.exit(1);
+          }
+
+          lst.format("%n");
+          lineCount++;
+        } 
+
         ADV();
         printErrorList();
+        op0 = false;
+        operand = false;
         return sax_INIT; // get another line
       }
       err(tok + ": unexpected token");
@@ -122,7 +152,6 @@ public class Sax {
       if (tok.val == Token.Val.COLON) {
         ADV();
         //FIXME
-        addReloc(LC);
         symtabPut(label, new Value.Defined(1,LC));
         //TODO fixed?????????????????????????
         return sax_OP;
@@ -151,6 +180,7 @@ public class Sax {
           return sax_EAT; // syntax error
         //publish information to object module
         emitVal(val);
+        operand = true;
         return sax_NL;
       }
       if (tok.val == Token.Val.DW) {
@@ -315,6 +345,7 @@ public class Sax {
     }
     if (pass == 2) {
       System.out.println(op);
+      lst.format(" %2d", op);
     }
     LC++;
   }
@@ -325,12 +356,15 @@ public class Sax {
       if (v == Value.UNDEF) {
         err(v + ": undefined operand value");
       } else {
-        if (v.isRelative())
+        if (v.isRelative()){
           addReloc(LC); // add to relocation dictionary
-        else if (v.isExtern())
+        } else if (v.isExtern()){
           v.addFixup(LC);  // add LC to the EXTERN fixup list
+        }
+        lst.format("%16d%s", v.getVal(), v.isRelative() ? "R" : " " );
         System.out.println(v.getVal());
       }	    
+      op0=true;
     }
     LC++;
   }
@@ -365,14 +399,6 @@ public class Sax {
       MRNL = s;
       symtab.put(s,v);
     }
-    /*
-       if(s.charAt(0) == '@'){
-       s = MRNL + s;
-       }
-       if(!symtab.get(s).isDefined()){
-       err(s + ": UNDEF label in pass 2"); 
-       }
-     */
   }
 
   // This method does not handle local labels properly /* FIXME */
@@ -443,7 +469,14 @@ public class Sax {
       System.err.println(e + " -- assembly aborted");
       System.exit(1);
     }
+    try {
+      BR = new BufferedReader(new FileReader(prog));
+    } catch (Exception e1) {
+      System.err.println(e1 + " -- assembly aborted");
+      System.exit(1);
+    }
   }
+
 
   public void rdrClose() {
     try {
@@ -457,6 +490,8 @@ public class Sax {
   // if the '-o out' command line option is given,
   // redirect System.out to the corresponding PrintStream 
   public void run() {
+    //Print listing file
+
     if (out != null) {
       try {
         System.setOut(new PrintStream(out));
@@ -465,7 +500,18 @@ public class Sax {
         System.exit(1);
       }
     }
+    if(list != null){
+      //FIXME 
+    }
+
+
+
     lst = System.err; /* FIXME */
+
+    if(list != null){
+      printList();
+    }
+
     entryID = null;
     // do two passes
     for (pass=1 ; pass <= 2 ; pass++) {
@@ -498,7 +544,35 @@ public class Sax {
     System.out.println("% ENTRY, EXTERN, and PUBLIC references");
     /* FIXME */
     //Place EXTERN and PUBLIC references
+
+    //Print ENTRY
+    System.out.println("ENTRY " + (symtab.get(entryID)).getVal());
+
+    //Print EXTERNs
+    for(String s : externList){ 
+      String out = "EXTERN " + s;
+      for(Integer i : ((Value.Extern)symtab.get(s)).fixupList){
+        out += " " + i;
+      }
+      System.out.println(out);
+    } 
+
+    //Print PUBLIC
+    for(String s : publicList){
+      String out = "PUBLIC " + s;
+      out += " " +(symtab.get(s)).getVal();
+      System.out.println(out);  
+    }
+
+
     System.out.println("% end of object module");
+
+  }
+
+  public void printList(){
+    lst.format("%-12s%-2s  %-2s %15s  %-30s%n", "Line", "LC", "Op", "Operand", "Source Line");
+    lst.format("%-12s%-2s  %-2s %15s  %-30s%n", "----", "--", "--", "-------", "-----------");
+
   }
 
   public static void main(String [] args) {
@@ -509,6 +583,7 @@ public class Sax {
     boolean legacy = false;
     int c;
     String usage = "usage: sax [-x] [-l <list>] [-o <obj>] <prog>";
+
     while ((c = g.getopt()) != -1) {
       switch((char)c) {
         case 'l': list = g.getOptarg(); break;

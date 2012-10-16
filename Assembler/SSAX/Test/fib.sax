@@ -21,4 +21,4 @@ loop:	dupl
 	dupl
 	call	prt
 	br	loop
-
+  public loop
