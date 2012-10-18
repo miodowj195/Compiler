@@ -6,6 +6,7 @@ import gnu.getopt.Getopt;
 
 public class Sax {
 
+  public Map<String, ArrayList<Integer>> labelToLineNo = null;
   public boolean dwBool = false; //check to see entry into sax_DWS
   public LineIO lio;
   public FileReader rdr;
@@ -38,6 +39,7 @@ public class Sax {
     this.out = out;
     this.prog = prog;
     this.legacy = legacy;
+    this.labelToLineNo = new HashMap<String, ArrayList<Integer>>();
     errorCount = 0;
     errorList = new ArrayList<String>();
     symtab = new HashMap<String, Value>();
@@ -86,6 +88,8 @@ public class Sax {
         ADV();
         // this is in label position
         label = tok.str.toString();
+        if(label != null)
+          ll(tok.str.toString(), lio.getLineNumber());
         return sax_ID;
       }
       return sax_OP;
@@ -125,6 +129,9 @@ public class Sax {
               lst.format("%3s", " ");
             }
             lst.format("%s", lio.getLine());
+            
+            ll(tok.str.toString(), lio.getLineNumber());
+            
             //reset the bools to go again!
             op0 = false;
             operand = false;
@@ -153,6 +160,7 @@ public class Sax {
         Value val = eval();
         if (val == null)
           return sax_EAT; // syntax error in expression    
+        ll(tok.str.toString(), lio.getLineNumber());
         symtabPut(label, val);
         // System.err.println(label + " EQU " + val);
         return sax_NL;
@@ -160,6 +168,7 @@ public class Sax {
       if (tok.val == Token.Val.COLON) {
         ADV();
         //FIXME
+        ll(tok.str.toString(), lio.getLineNumber());
         symtabPut(label, new Value.Defined(1,LC));
         //TODO fixed?????????????????????????
         return sax_OP;
@@ -658,22 +667,30 @@ public class Sax {
     lst.format("%-30s%7s   %12s%n","------", "-----", "------------");
 
     TreeSet<String> ordered = new TreeSet<String>(symtab.keySet());
-
+    List<Integer> temp;
     //the meat of the cross refernce list
     for(String s : ordered){
       lst.format("%-30s", s);
       Value cur = symtab.get(s);
       if(cur.isRelative()){
-        lst.format("%7sR|%n", cur.getVal());
+        lst.format("%7sR|", cur.getVal());
       }else{
-        lst.format("%7s |%n", cur.getVal());
+        lst.format("%7s |", cur.getVal());
+      }
+      temp = labelToLineNo.get(s);
+      if(temp == null){
+        lst.format("%n");
+        continue;
       }
 
+      Collections.sort(temp);
+
+      for(Integer i : temp){
+        lst.format(" %d ", i);
+      }
+      lst.format("%n");
+
     }
-
-
-
-
 
   }
 
@@ -681,6 +698,17 @@ public class Sax {
     lst.format("%-12s%-2s  %-2s %15s  %-30s%n", "Line", "LC", "Op", "Operand", "Source Line");
     lst.format("%-12s%-2s  %-2s %15s  %-30s%n", "----", "--", "--", "-------", "-----------");
 
+  }
+
+  public void ll(String label, Integer lineNo){
+    if(labelToLineNo.get(label) == null){
+      ArrayList<Integer> temp = new ArrayList<Integer>();
+      temp.add(lineNo);
+      labelToLineNo.put(label, temp);
+    } else {
+      if(!labelToLineNo.get(label).contains(lineNo))
+        labelToLineNo.get(label).add(lineNo);
+    }
   }
 
   public static void main(String [] args) {

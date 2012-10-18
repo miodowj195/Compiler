@@ -1,0 +1,38 @@
+Line        LC  Op         Operand  Source Line                   
+----        --  --         -------  -----------                   
+   1:        0                    ; subroutine to print a value followed by a newline
+   2:        0                       	entry	main
+   3:        0                       prt:
+   4:        0  9                    	swap
+   5:        1 40                    	print
+   6:        2  2              10    	pushv	10
+   7:        4 42                    	printc
+   8:        5 24                    	return
+   9:        6                       
+  10:        6                       ; iterative program to print the fibonacci numbers
+  11:        6                       main:
+  12:        6  2               0    	pushv	0
+  13:        8  8                    	dupl
+  14:        9 22               0R   	call	prt
+  15:       11  2               1    	pushv	1
+  16:       13  8                    	dupl
+  17:       14 22               0R   	call	prt
+  18:       16  8                    loop:	dupl
+  19:       17 12                    	rot
+  20:       18 27                    	add
+  21:       19  8                    	dupl
+  22:       20 22               0R   	call	prt
+  23:       22 21              16R   	br	loop
+  24:       24                         public loop
+ EOF:       24
+
+
+
+Cross Reference List
+--------------------
+Symbol                          Value   Line Numbers
+------                          -----   ------------
+SP                                  0 |
+loop                               16R|
+main                                6R|
+prt                                 0R|
