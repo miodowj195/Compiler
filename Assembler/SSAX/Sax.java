@@ -6,12 +6,11 @@ import gnu.getopt.Getopt;
 
 public class Sax {
 
-
-  public boolean op0 = false;
-  public boolean operand = false;
-  public int lineCount = 1;
+  public boolean dwBool = false; //check to see entry into sax_DWS
   public LineIO lio;
   public FileReader rdr;
+  public boolean op0 = false; //tells you if you have an op on the line
+  public boolean operand = false; //tells you if you have an operand 
   public BufferedReader BR;
   public PrintStream lst; // the listing file
   public StreamReader<Token> tokio;
@@ -29,7 +28,7 @@ public class Sax {
   public Sax sax;        // it's all about me, me, me!!
   public int errorCount; // count of syntax errors (don't do pass 2 if >0)
   public List<String> errorList;   // current line error messages
-  public String MRNL = null;
+  public String MRNL = null; //the most recently seen non local label
 
   public Sax (String list,
       String out,
@@ -77,8 +76,9 @@ public class Sax {
         }
         return null; // end of this pass!
       }
+      //pass two! start writing to listing file
       if(pass == 2){
-        lst.format("%4d:", lineCount);
+        lst.format("%4d:", lio.getLineNumber());
         lst.format("%9d", LC);
       }
 
@@ -110,25 +110,33 @@ public class Sax {
     public FSMState next() {
       Token tok = CUR();
       if (tok.val == Token.Val.NEWLINE) {
-        if(pass == 2){
-          try{
-            if(!op0){
-              lst.format("%21s", " ");
-            }
-            lst.format(" %s",BR.readLine());
-          } catch(Exception e){
-            System.err.println(e); 
-            System.exit(1);
-          }
-
-          lst.format("%n");
-          lineCount++;
-        } 
-
         ADV();
         printErrorList();
-        op0 = false;
-        operand = false;
+        if(pass == 2 && !dwBool){
+          try{
+            //stupid number of booleans to format format listing file
+            if(!operand && !op0){
+              lst.format("%23s", " ");
+            }else if(!operand){
+              lst.format("%20s", " ");
+            }else if(!op0){
+              lst.format("%2s", " ");
+            }else if(op0 && operand){
+              lst.format("%3s", " ");
+            }
+            lst.format("%s", lio.getLine());
+            //reset the bools to go again!
+            op0 = false;
+            operand = false;
+          } catch(Exception e){
+            System.err.println(e + ": cannot read line");
+            System.exit(1);
+          }
+          //line break
+          lst.format("%n");
+        }
+        dwBool =false;
+
         return sax_INIT; // get another line
       }
       err(tok + ": unexpected token");
@@ -144,7 +152,7 @@ public class Sax {
         ADV();
         Value val = eval();
         if (val == null)
-          return sax_EAT; // syntax error in expression
+          return sax_EAT; // syntax error in expression    
         symtabPut(label, val);
         // System.err.println(label + " EQU " + val);
         return sax_NL;
@@ -180,7 +188,6 @@ public class Sax {
           return sax_EAT; // syntax error
         //publish information to object module
         emitVal(val);
-        operand = true;
         return sax_NL;
       }
       if (tok.val == Token.Val.DW) {
@@ -226,16 +233,32 @@ public class Sax {
         // emit the individual characters in the string
       } else {
         Value val = eval();
+        emitVal(val);
         if (val == null) // expression syntax error
           return sax_EAT;
-        emitVal(val);
+        if(!dwBool){
+          //emitVal(val);
+          if(pass == 2)
+            lst.format("%s", lio.getLine());
+          dwBool = true;
+        } else {
+          if(pass == 2)
+            lst.format("%5d", LC);
+          //emitVal(val);
+        }
       }
+
+
       // loop back for more DWs
       tok = CUR();
       if (tok.val == Token.Val.COMMA) {
         ADV();
+        if(pass == 2)
+          lst.format("%n%6s", " ");
         return this;
       }
+      if(pass == 2)
+        lst.format("%n");
       return sax_NL;
     }
   };
@@ -336,7 +359,8 @@ public class Sax {
   // emit an opcode
   //used in object module formation
   public void emitOp(int op) {
-    // use legacy opcodes (no CALLS instruction)
+    // use legacy opcodes (no CALLS instruction
+    op0 =true;
     if (legacy) {
       if (op == 23)
         err(op + ": illegal legacy opcode");
@@ -361,10 +385,14 @@ public class Sax {
         } else if (v.isExtern()){
           v.addFixup(LC);  // add LC to the EXTERN fixup list
         }
+        if(op0 == false){
+          lst.format("%3s", " ");
+        }
         lst.format("%16d%s", v.getVal(), v.isRelative() ? "R" : " " );
         System.out.println(v.getVal());
       }	    
-      op0=true;
+
+      operand=true;
     }
     LC++;
   }
@@ -373,7 +401,9 @@ public class Sax {
   public void emitDS(int ds) {
     /* FIXME */
     //TODO FIXED?????????????????
-    System.out.println(":" + ds);
+    if(pass == 2){
+      System.out.println(":" + ds);
+    }
     LC += ds;
   }
 
@@ -383,30 +413,53 @@ public class Sax {
   // be re-evaluated (possibly still UNDEF).
   // This method does not handle local labels properly /* FIXME */
   public void symtabPut(String s, Value v) {
+    Value vv;
     // System.err.println("... put("+s+","+v+") ...");
     if(pass ==1){
+      //trim label length to 30 chars only
+      if(s.length() > 30){
+        s=s.substring(0,30);
+      }
       //deal with local labels
       if(s.charAt(0) == '@'){
         if(MRNL == null){
           err(s + ": cannot set local label without a non local");
         }          
         s = MRNL + s;
+      }else{
+        //s is non-local
+        vv = symtab.get(s);
+        if (vv != null && pass == 1){
+          err(s + ": multiply defined label");
+        }
+        MRNL = s;
       }
-      Value vv = symtab.get(s);
+      vv = symtab.get(s);
       if (vv != null && pass == 1){
         err(s + ": multiply defined label");
       }
-      MRNL = s;
       symtab.put(s,v);
     }
   }
 
-  // This method does not handle local labels properly /* FIXME */
   public Value symtabGet(String s) {
+
+    // check if greater than 30... b/c I'm nervous :\
+    if(s.length() >30){
+      s = s.substring(0,30);
+    }
+
+    if((s.toUpperCase()).equals("SP"))
+      s = "SP";
+
+    //check if the label is local, and if it is wrapped by a 
+    //non-local label
     if(isLocal(s)){
       if(MRNL!= null){
+        //append the label with its non-local counterpart
         s = MRNL + s;
       }else{
+        //local label must have a non-local label before it
         err(s + ": no non-local label defined");
       }
     }
@@ -419,10 +472,21 @@ public class Sax {
 
   public void processString(String s) {
     int len = s.length();
+
     for (int i=0 ; i<len ; i++) {
       //place the ascii value of the character in the module
       Value v = new Value.Defined((int)s.charAt(i));
       emitVal(v);
+      if(!dwBool){
+        lst.format("%s", lio.getLine());
+        lst.format("%n%9s", " ");
+        dwBool = true;
+      }else if(i == len-1){
+        lst.format("%5d", LC, " ");
+      }else{
+        lst.format("%5d", LC);
+        lst.format("%n%9s", " ");
+      }
     }
   }
 
@@ -490,8 +554,8 @@ public class Sax {
   // if the '-o out' command line option is given,
   // redirect System.out to the corresponding PrintStream 
   public void run() {
-    //Print listing file
 
+    //redirect the object module to a file if the -o flag is set
     if (out != null) {
       try {
         System.setOut(new PrintStream(out));
@@ -500,16 +564,29 @@ public class Sax {
         System.exit(1);
       }
     }
+
+    //redirect listing file to a file, is the -l flag is set
     if(list != null){
-      //FIXME 
-    }
-
-
-
-    lst = System.err; /* FIXME */
-
-    if(list != null){
-      printList();
+      try {
+        lst = new PrintStream(list);
+      } catch (FileNotFoundException e){   
+        System.err.println(lst+ ": cannot create listing file for writing");
+        System.exit(1);
+      }
+    }else{
+      //hackish way to deal with no -l param
+      try{
+        File f = new File("list");
+        lst = new PrintStream(f){
+          public PrintStream format(String format, Object ... args){
+            return null; 
+          }
+        };
+        f.delete();
+      }catch(FileNotFoundException e){
+        System.err.println(lst+ ": cannot create temp output file for listing");
+        System.exit(1);
+      }
     }
 
     entryID = null;
@@ -517,6 +594,9 @@ public class Sax {
     for (pass=1 ; pass <= 2 ; pass++) {
       errorCount = 0;
       if (pass == 2) {
+
+        //begin printing the listing file (header only)
+        printList();
         String xx = legacy ? "-" : "+";
         System.out.println("%SXX" + xx + "Object Module");
         System.out.println("# Object module for file " + prog);
@@ -546,10 +626,14 @@ public class Sax {
     //Place EXTERN and PUBLIC references
 
     //Print ENTRY
-    System.out.println("ENTRY " + (symtab.get(entryID)).getVal());
+    if(entryID != null)
+      System.out.println("ENTRY " + entryID + " " + (symtab.get(entryID)).getVal());
 
     //Print EXTERNs
     for(String s : externList){ 
+      if((((Value.Extern)symtab.get(s)).fixupList).isEmpty())
+        continue;
+
       String out = "EXTERN " + s;
       for(Integer i : ((Value.Extern)symtab.get(s)).fixupList){
         out += " " + i;
@@ -559,13 +643,37 @@ public class Sax {
 
     //Print PUBLIC
     for(String s : publicList){
-      String out = "PUBLIC " + s;
+      String out = "PUBLIC " + s + " " + symtab.get(s).getVal();
       out += " " +(symtab.get(s)).getVal();
       System.out.println(out);  
     }
 
 
     System.out.println("% end of object module");
+
+    //print header for cross reference list
+    lst.format("%n%n%n%s%n","Cross Reference List");
+    lst.format("%s%n","--------------------");
+    lst.format("%-30s%7s   %12s%n","Symbol", "Value", "Line Numbers");
+    lst.format("%-30s%7s   %12s%n","------", "-----", "------------");
+
+    TreeSet<String> ordered = new TreeSet<String>(symtab.keySet());
+
+    //the meat of the cross refernce list
+    for(String s : ordered){
+      lst.format("%-30s", s);
+      Value cur = symtab.get(s);
+      if(cur.isRelative()){
+        lst.format("%7sR|%n", cur.getVal());
+      }else{
+        lst.format("%7s |%n", cur.getVal());
+      }
+
+    }
+
+
+
+
 
   }
 

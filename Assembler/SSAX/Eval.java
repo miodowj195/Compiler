@@ -104,6 +104,10 @@ public class Eval {
       Token t = CUR();
       debug("FACTOR: " + t);
       switch(t.val) {
+        case DOLLAR:
+          ADV();
+          stk.push(new Value.Defined(1, sax.LC));
+          return null;
         case INT:
           ADV();
           try {

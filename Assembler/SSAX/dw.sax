@@ -1,0 +1,3 @@
+dw 'w,'c,'v
+dw "foo"
+dw 1

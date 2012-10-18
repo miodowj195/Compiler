@@ -1,0 +1,3 @@
+	halt
+	DS	20000
+	pushv	1
