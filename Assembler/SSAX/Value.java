@@ -1,5 +1,9 @@
 import java.util.*;
 
+/**
+* Value determines the value of tokens that have been read in (shocking)
+* 
+**/
 public abstract class Value {
 
   public Value add(Sax sax, Value v) {
@@ -81,15 +85,19 @@ public abstract class Value {
       throw new NumberFormatException("zero-length string");
      /* FIXME */
   
+    //it's just a 0, not a octal or hex
     if(s.charAt(0) ==  '0' && len == 1)
     return 0;
 
+  //create a new hex
   if(s.toUpperCase().startsWith("0X"))
     return Integer.parseInt(s.substring(2,len), 16);	
 
+  //create a new octal
   if(s.startsWith("0"))
     return Integer.parseInt(s.substring(1,len), 8);
 
+  //a new char
   if(s.startsWith("\'"))
     return (int)s.charAt(1);
 
@@ -140,6 +148,7 @@ public static class Defined extends Value {
   /****/
   public Value sub(Sax sax, Value v) {
     /* FIXME */
+    //you must not subtract a relative
     if (! v.isDefined()) {
       sax.msg(v+": cannot appear as second argument to subtract");
       return UNDEF;
@@ -165,6 +174,7 @@ public static class Defined extends Value {
 
   public Value div(Sax sax, Value v) {
     /* FIXME */
+    //you must not divide by relatives
     if(! v.isDefined()){
       sax.msg(v+": cannot appear as second argument to divide");
       return UNDEF;
@@ -178,6 +188,7 @@ public static class Defined extends Value {
 
   public Value mod(Sax sax, Value v) {
     /* FIXME */
+    //you must not devide by relatives
     if(! v.isDefined()){
       sax.msg(v+": cannot appear as second argument to modulo");
       return UNDEF;

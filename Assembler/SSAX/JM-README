@@ -1,0 +1,36 @@
+This folder contains the source files and dependancies of
+the assembler. Additionally it also contians a folder of 
+test sax programs that were used in the testing of the assembler.
+
+
+  File:
+        Eval.java - Class used for the evaluation of expressions used 
+                    by the program.  
+                    
+        Optab.java- Essentially at class used to store a Map of all the
+                    compiler opcodes that are used in sax programs.
+
+        Sax.java  - The body of the program. sax programs get assembled 
+                    through this program, and have object modules, listing
+                    files, and cross reference lists produced as a result
+                        - KNOWN BUGS:
+                           1. Does not handle DW directives 'pretty'
+                              in the listing file all the time
+                           2. Does not handle labels (local or otherwise)
+                              that do not appear in label position in the 
+                              cross reference table. Additionally, it does
+                              does not place a '*' next to label line 
+                              numbers if they defined on that line.
+     Scanner.java - File used for directly consuming token.
+ TokenReader.java - Class which is called by Scanner, to handle incoming
+                    characters, and convert them to their appropriate
+                    tokens.
+       Token.java - A class defining the fields and properties of a token
+                    as well as a enum of all the types of Vals.
+          
+       Test/      - A folder contianing sample sax programs usesd to test
+                    Sax.java during development.
+       
+------------------
+Created by Jonathan Miodownik 1Oct12
+Last Modified 13Oct12       

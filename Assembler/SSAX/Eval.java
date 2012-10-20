@@ -2,6 +2,12 @@ import cis463.util.*;
 import cis463.fsm.*;
 import java.util.*;
 
+/**
+ * eval is used to determine the values of expressions found in sax programs
+ * For more specific information on its behavior, please see assignment
+ * documentation.
+ */
+
 public class Eval {
 
   private Lazy<Token> lztok;
@@ -46,6 +52,8 @@ public class Eval {
         case MINUS: {
                       ADV();
                       /* FIXME */
+                      //pop the value off the stack
+                      //and push the evaluation of the op back on
                       Value x = stk.pop();
                       FSM.run(expr_TERM);
                       stk.push(x.sub(sax, stk.pop()));
@@ -80,6 +88,9 @@ public class Eval {
         case DIVIDE: {
                        ADV();
                        /* FIXME */
+                       //pop the value off the stack 
+                       //perform the divide, and push the value
+                       //back on the stack
                        Value x = stk.pop();
                        FSM.run(expr_FACTOR);
                        stk.push(x.div(sax, stk.pop()));
@@ -88,6 +99,9 @@ public class Eval {
         case MOD: {
                     ADV();
                     /* FIXME */
+                    //pop the value off the stack 
+                    //perform the mod, and push the value
+                    //back on the stack
                     Value x = stk.pop();
                     FSM.run(expr_FACTOR);
                     stk.push(x.mod(sax, stk.pop()));
@@ -117,6 +131,7 @@ public class Eval {
           } catch (NumberFormatException e) {
             stk.push(new Value.Defined(0)); // overflow!
             /* FIXME?? throw new RuntimeException(e); */
+            //NOPE! NOT GOING TO....design decision
           }
         case MINUS:
           // unary minus

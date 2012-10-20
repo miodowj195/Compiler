@@ -4,8 +4,26 @@ import java.util.*;
 import java.io.*;
 import gnu.getopt.Getopt;
 
+
+
+/**
+ * Sax.java is the body of the assembler -- sax will jump from state to state of what 
+ * a sax program body should be (for specific information regarding the structure 
+ * of a sax program, please see the assignment documentation). Two passes of the 
+ * assembler are run on the sax program (to allow for initially undefined labels to get
+ * defined later). Addionally, sax.java will create object module code to either std.out
+ * or a file with a command line argument. This is also true for the listing file, 
+ * however, if no -l argument is given, no listig file output will be seen. 
+ * For a listing of known bugs, please refer to JM-README.
+ * 
+ **/
+
+
+
+
 public class Sax {
 
+  //hashmap to be used to populate the cross reference table
   public Map<String, ArrayList<Integer>> labelToLineNo = null;
   public boolean dwBool = false; //check to see entry into sax_DWS
   public LineIO lio;
@@ -72,6 +90,7 @@ public class Sax {
       label = null;
       Token tok = CUR();
       if (tok.val == Token.Val.EOF) {
+        //write to object module if pass 2
         if(pass==2){
           lst.format("%4s:", "EOF");
           lst.format("%9d%n", LC);
@@ -133,6 +152,7 @@ public class Sax {
             ll(tok.str.toString(), lio.getLineNumber());
             
             //reset the bools to go again!
+            //used in listing file creation
             op0 = false;
             operand = false;
           } catch(Exception e){
@@ -142,6 +162,7 @@ public class Sax {
           //line break
           lst.format("%n");
         }
+        //reset the defineword bool 
         dwBool =false;
 
         return sax_INIT; // get another line
@@ -160,7 +181,9 @@ public class Sax {
         Value val = eval();
         if (val == null)
           return sax_EAT; // syntax error in expression    
+        //add the label and lineno to our cross reference table
         ll(tok.str.toString(), lio.getLineNumber());
+        //place the label in the symboltable
         symtabPut(label, val);
         // System.err.println(label + " EQU " + val);
         return sax_NL;
@@ -169,8 +192,8 @@ public class Sax {
         ADV();
         //FIXME
         ll(tok.str.toString(), lio.getLineNumber());
+        //put the new defined label in the symtab (label: ) 
         symtabPut(label, new Value.Defined(1,LC));
-        //TODO fixed?????????????????????????
         return sax_OP;
       }
       return sax_EAT;
@@ -242,18 +265,18 @@ public class Sax {
         // emit the individual characters in the string
       } else {
         Value val = eval();
+        //put the val in the val in the object module
         emitVal(val);
         if (val == null) // expression syntax error
           return sax_EAT;
         if(!dwBool){
-          //emitVal(val);
           if(pass == 2)
+            //add the dw to the obj module
             lst.format("%s", lio.getLine());
           dwBool = true;
         } else {
           if(pass == 2)
             lst.format("%5d", LC);
-          //emitVal(val);
         }
       }
 
@@ -284,7 +307,7 @@ public class Sax {
       String id = tok.str.toString();
       if (pass == 1) {
         symtabPut(id, new Value.Extern(id)); /* FIXME */
-        //TODO fixed???????
+        //add the id to the extern list
         externList.add(id);
       }
       // loop back for more EXTERNs
@@ -338,18 +361,20 @@ public class Sax {
          or not relocatable
        */
       if(pass == 1){
+        //entryID can only be defined once!
         if(entryID != null){
           err(tok + " ENTRY already defined as: " + entryID);
           return sax_EAT;
         }
+        //set the id
         entryID=id;
       }
       if(pass == 2){
+        //entry point must also be found by pass 2 and must be absolute!
         if(entryID == null || (symtabGet(entryID)).isAbsolute()){
           err(tok + " ENTRY must not be null, or absolute");
           return sax_EAT;
         }
-        //TODO print to object module????????
       }
       return sax_NL;
     }
@@ -409,7 +434,7 @@ public class Sax {
   // emit a DS value (a colon followed by a positive integer value)
   public void emitDS(int ds) {
     /* FIXME */
-    //TODO FIXED?????????????????
+    //print the ds to the obj module
     if(pass == 2){
       System.out.println(":" + ds);
     }
@@ -486,6 +511,7 @@ public class Sax {
       //place the ascii value of the character in the module
       Value v = new Value.Defined((int)s.charAt(i));
       emitVal(v);
+      // all listing file formatting
       if(!dwBool){
         lst.format("%s", lio.getLine());
         lst.format("%n%9s", " ");
@@ -584,6 +610,7 @@ public class Sax {
       }
     }else{
       //hackish way to deal with no -l param
+      //THESE ARE NOT THE DRIODS YOU ARE LOOKING FOR... MOVE ALONG... MOVE ALONG....
       try{
         File f = new File("list");
         lst = new PrintStream(f){
@@ -627,14 +654,12 @@ public class Sax {
         System.exit(2);
       }
     }
+
+    //add the relocation dictionary
     System.out.println("% relocation dictionary");
     for (Integer r : relocationDictionary)
       System.out.println(r);
     System.out.println("% ENTRY, EXTERN, and PUBLIC references");
-    /* FIXME */
-    //Place EXTERN and PUBLIC references
-
-    //Print ENTRY
     if(entryID != null)
       System.out.println("ENTRY " + entryID + " " + (symtab.get(entryID)).getVal());
 
@@ -694,18 +719,24 @@ public class Sax {
 
   }
 
+  //Method used to print the header of the listing file.
   public void printList(){
     lst.format("%-12s%-2s  %-2s %15s  %-30s%n", "Line", "LC", "Op", "Operand", "Source Line");
     lst.format("%-12s%-2s  %-2s %15s  %-30s%n", "----", "--", "--", "-------", "-----------");
 
   }
 
+  //method used for adding line numbers of labels to the cross reference table
+  //this gets called every time lio.getLineNumber is referenced
   public void ll(String label, Integer lineNo){
+    //check if the map contains the key already (the label)
+    //if not, add it, as well as it's corresponding line no.
     if(labelToLineNo.get(label) == null){
       ArrayList<Integer> temp = new ArrayList<Integer>();
       temp.add(lineNo);
       labelToLineNo.put(label, temp);
     } else {
+      //if already in the map, append the lineno to the list
       if(!labelToLineNo.get(label).contains(lineNo))
         labelToLineNo.get(label).add(lineNo);
     }
